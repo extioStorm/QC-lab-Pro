@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#1f2937">
-  <title>Lab Procedure Prototype</title>
+  <title>Lab Procedure Engine</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,7 +14,7 @@
         <div class="brand-mark">L</div>
         <div>
           <strong>Lab Framework</strong>
-          <small>Prototype</small>
+          <small>PWA Knowledge Engine</small>
         </div>
       </div>
 
@@ -22,134 +22,52 @@
         <button class="tree-item active">Dashboard</button>
 
         <button class="tree-item expandable" data-target="testing">
-          <span>▾</span> Testing
+          <span>▾</span> Asphalt Testing
         </button>
         <div id="testing" class="tree-children">
-          <button class="tree-item selected">Example Asphalt Test</button>
-          <button class="tree-item">Placeholder Test</button>
+          <button class="tree-item selected">Core Density (Gmb)</button>
+          <button class="tree-item">Rice Test (Gmm)</button>
         </div>
 
         <button class="tree-item expandable" data-target="modules">
-          <span>▾</span> Modules
+          <span>▾</span> Lab Routines
         </button>
         <div id="modules" class="tree-children">
-          <button class="tree-item">Installed Modules</button>
-          <button class="tree-item">Module Manager</button>
+          <button class="tree-item">Opening Checklist</button>
+          <button class="tree-item">Equipment Calibration</button>
         </div>
 
-        <button class="tree-item">Reference</button>
+        <button class="tree-item">Lab Ledger / Book</button>
         <button class="tree-item">Settings</button>
       </nav>
 
       <div class="sidebar-footer">
-        <small>Framework v0.1 prototype</small>
+        <small>Framework v0.3</small>
       </div>
     </aside>
 
     <main class="workspace">
       <header class="topbar">
         <div>
-          <span class="eyebrow">MODULE</span>
-          <h1>Example Asphalt Test</h1>
+          <span class="eyebrow">AASHTO T 166 / ASTM D2726</span>
+          <h1 id="procedure-title">Bulk Specific Gravity & Density of Compacted Cores</h1>
         </div>
         <button class="menu-button" aria-label="Toggle navigation">☰</button>
       </header>
 
       <section class="module-shell">
-        <div class="view-switcher">
-          <button class="view-button active" data-view="perform">Perform</button>
-          <button class="view-button" data-view="calculate">Calculate</button>
-          <button class="view-button" data-view="reference">Reference</button>
-        </div>
-
-        <div class="prism" aria-hidden="true">
-          <div class="prism-face prism-left">P</div>
-          <div class="prism-face prism-front">C</div>
-          <div class="prism-face prism-right">R</div>
-        </div>
-
-        <div id="view-perform" class="module-view active">
-          <div class="view-heading">
-            <div>
-              <span class="eyebrow">GUIDED PROCEDURE</span>
-              <h2>Perform Test</h2>
-            </div>
-            <span class="status">Step 2 of 4</span>
-          </div>
-
-          <div class="step-card">
-            <span class="step-number">02</span>
-            <div>
-              <h3>Record sample mass</h3>
-              <p>Enter the measured sample mass, then continue when ready.</p>
-              <input class="number-input" type="number" placeholder="Sample mass (g)">
-            </div>
-          </div>
-
-          <div class="requirements">
-            <h3>Known requirements</h3>
-            <ul>
-              <li>Sample prepared</li>
-              <li>Balance available</li>
-              <li>Sample mass recorded</li>
-            </ul>
-          </div>
-
-          <div class="actions">
-            <button class="secondary">Previous</button>
-            <button class="primary">Continue</button>
+        <!-- Disclosure / Mode Toolbar -->
+        <div class="mode-bar">
+          <span class="mode-label">Detail Depth:</span>
+          <div class="mode-toggle">
+            <button class="depth-btn" data-depth="speed">Speed Mode</button>
+            <button class="depth-btn active" data-depth="custom">Interactive</button>
+            <button class="depth-btn" data-depth="learning">Expand All (Learning)</button>
           </div>
         </div>
 
-        <div id="view-calculate" class="module-view">
-          <div class="view-heading">
-            <div>
-              <span class="eyebrow">DIRECT ENTRY</span>
-              <h2>Calculate</h2>
-            </div>
-            <span class="status">Live calculation</span>
-          </div>
-
-          <div class="calculator-card">
-            <label>
-              Sample mass
-              <input id="sampleMass" class="number-input calc-input" type="number" placeholder="g">
-            </label>
-            <label>
-              Volume
-              <input id="volume" class="number-input calc-input" type="number" placeholder="cm³">
-            </label>
-            <div class="result">
-              <span>Example derived value</span>
-              <strong id="result">—</strong>
-            </div>
-          </div>
-
-          <p class="muted">Placeholder only. This demonstrates how entered values can propagate through the module.</p>
-        </div>
-
-        <div id="view-reference" class="module-view">
-          <div class="view-heading">
-            <div>
-              <span class="eyebrow">INFORMATION</span>
-              <h2>Reference</h2>
-            </div>
-          </div>
-
-          <div class="reference-card">
-            <h3>About this procedure</h3>
-            <p>This is a deliberately small placeholder for procedural explanations, notes, standards, warnings, and other reference material.</p>
-          </div>
-
-          <div class="requirements">
-            <h3>Known requirements</h3>
-            <ul>
-              <li>Approved sample</li>
-              <li>Suitable balance</li>
-              <li>Recorded measurements</li>
-            </ul>
-          </div>
-        </div>
+        <!-- Single Workspace Output Canvas -->
+        <div id="procedural-workspace"></div>
       </section>
     </main>
   </div>
