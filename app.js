@@ -1,5 +1,5 @@
 /**
- * Lab Framework - Procedural Knowledge Engine (v0.3)
+ * Lab Framework - Procedural Knowledge Engine (v0.3.1 - Fix)
  * Unified dynamic UI output driven by progressive disclosure components.
  */
 
@@ -91,21 +91,37 @@ class ProcedureEngine {
   }
 
   saveDraftState() {
-    localStorage.setItem(`draft_${this.schema.id}`, JSON.stringify(this.values));
+    try {
+      localStorage.setItem(`draft_${this.schema.id}`, JSON.stringify(this.values));
+    } catch (e) {
+      console.warn("Could not save state to localStorage", e);
+    }
   }
 
   loadDraftState() {
-    const saved = localStorage.getItem(`draft_${this.schema.id}`);
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem(`draft_${this.schema.id}`);
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
   }
 
   saveLedgerState() {
-    localStorage.setItem(`ledger_${this.schema.id}`, JSON.stringify(this.ledger));
+    try {
+      localStorage.setItem(`ledger_${this.schema.id}`, JSON.stringify(this.ledger));
+    } catch (e) {
+      console.warn("Could not save ledger to localStorage", e);
+    }
   }
 
   loadLedgerState() {
-    const saved = localStorage.getItem(`ledger_${this.schema.id}`);
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem(`ledger_${this.schema.id}`);
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return [];
+    }
   }
 
   updateValue(key, val) {
@@ -163,6 +179,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const depthButtons = document.querySelectorAll(".depth-btn");
   const menuButton = document.querySelector(".menu-button");
   const sidebar = document.querySelector(".sidebar");
+
+  if (!workspace) {
+    console.error("Target container #procedural-workspace not found in HTML.");
+    return;
+  }
 
   if (menuButton) {
     menuButton.addEventListener("click", () => sidebar.classList.toggle("open"));
@@ -245,10 +266,10 @@ document.addEventListener("DOMContentLoaded", () => {
           <details class="disclosure" ${isLearning ? 'open' : ''} style="margin-bottom: 16px;">
             <summary>Calculation Formulas & Derivations</summary>
             <div class="disclosure-body">
-              <p style="margin-bottom: 4px;">• <strong>Displaced Volume:</strong> $V = C - B$</p>
-              <p style="margin-bottom: 4px;">• <strong>Bulk Specific Gravity:</strong> $G_{mb} = A / (C - B)$</p>
-              <p style="margin-bottom: 4px;">• <strong>Density %:</strong> $(G_{mb} / G_{mm}) \\times 100$</p>
-              <p style="margin-bottom: 0;">• <strong>Unit Weight (pcf):</strong> $G_{mb} \\times 62.245$</p>
+              <p style="margin-bottom: 4px;">• <strong>Displaced Volume:</strong> V = C - B</p>
+              <p style="margin-bottom: 4px;">• <strong>Bulk Specific Gravity:</strong> Gmb = A / (C - B)</p>
+              <p style="margin-bottom: 4px;">• <strong>Density %:</strong> (Gmb / Gmm) * 100</p>
+              <p style="margin-bottom: 0;">• <strong>Unit Weight (pcf):</strong> Gmb * 62.245</p>
             </div>
           </details>
         ` : ''}
@@ -268,12 +289,13 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
 
-    document.getElementById("commit-btn").addEventListener("click", () => {
-      engine.commitToBook();
-    });
+    const commitBtn = document.getElementById("commit-btn");
+    if (commitBtn) {
+      commitBtn.addEventListener("click", () => engine.commitToBook());
+    }
   }
 
-  // Minimal non-destructive DOM update for live input recalculation
+  // Minimal DOM update for live input recalculation
   function updateLiveResults() {
     const res = engine.calculate();
     const items = document.querySelectorAll(".result-item strong");
@@ -286,6 +308,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Initial Load
+  // Initial Load Execution
   renderWorkspace();
 });
