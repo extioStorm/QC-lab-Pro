@@ -1,83 +1,74 @@
 /**
- * Lab Framework - Procedural Knowledge Engine (v0.3.1 - Fix)
- * Unified dynamic UI output driven by progressive disclosure components.
+ * Lab Framework - Procedural Knowledge Engine (v0.4.0 - Step-by-Step Wizard)
+ * Sequential subtask progression with standalone entry capabilities.
  */
 
-// 1. DATA SCHEMA: Single Procedural Knowledge Definition
 const coreDensityProcedure = {
   id: "gmb_core_density_v1",
-  title: "Bulk Specific Gravity & Density of Compacted Cores",
-  standard: "AASHTO T 166 / ASTM D2726",
-  inputs: [
+  title: "Bulk Specific Gravity & Density (AASHTO T 166)",
+  parentModule: "Asphalt Field & Lab Quality Control",
+  submodule: "Lab Testing & Specific Gravity",
+  
+  steps: [
     {
-      key: "station_location",
-      label: "Station / Location",
-      type: "text",
-      placeholder: "e.g., 104+50 Rt",
-      guidance: "Record physical paving location on the roadway project.",
-      learning: "Traceability links lab core verification back to exact field stations for quality assurance lot tracking."
+      id: "prep",
+      title: "Step 1: Specimen & Equipment Prep",
+      description: "Prepare the core and verify laboratory equipment parameters.",
+      guidance: "Ensure core surface is clean of residual tack/dirt. Verify water bath is stabilized at 77°F ± 1.8°F (25°C ± 1°C). Zero/tare the balance.",
+      learning: "Proper specimen prep and bath temperature regulation prevent fluid density shifts that invalidate buoyancy calculations.",
+      inputs: [
+        { key: "station_location", label: "Station / Location", type: "text", placeholder: "e.g., 104+50 Rt" },
+        { key: "core_id", label: "Core Identifier", type: "text", placeholder: "e.g., C-12" }
+      ]
     },
     {
-      key: "core_id",
-      label: "Core Identifier",
-      type: "text",
-      placeholder: "e.g., C-12",
-      guidance: "Record the unique specimen identifier stamped or marked on core.",
-      learning: "Maintains clear chain of custody from drilling operation through lab testing and record storage."
+      id: "dry_mass",
+      title: "Step 2: Dry Mass In Air (A)",
+      description: "Measure baseline dry mass of the specimen.",
+      guidance: "Dry specimen to constant mass at 125°F (52°C) if required, cool to room temperature, and weigh in air.",
+      learning: "Establishes baseline dry mass (A) prior to water absorption.",
+      inputs: [
+        { key: "mass_dry_A", label: "Dry Mass (A)", unit: "g", type: "number", placeholder: "0.0" }
+      ]
     },
     {
-      key: "mass_dry_A",
-      label: "Dry Mass (A)",
-      unit: "g",
-      type: "number",
-      placeholder: "0.0",
-      guidance: "Dry specimen to constant mass at 125°F (52°C) and weigh in air.",
-      learning: "Establishes baseline dry mass before any water absorption occurs."
+      id: "submerged_mass",
+      title: "Step 3: Submerged Mass (B)",
+      description: "Measure buoyant weight in 77°F water bath.",
+      guidance: "Immerse core in water bath for 3 to 5 minutes. Record buoyant mass while completely submerged.",
+      learning: "Archimedes' Principle: Displaced water mass equals buoyant upward force.",
+      inputs: [
+        { key: "mass_submerged_B", label: "Submerged Mass (B)", unit: "g", type: "number", placeholder: "0.0" }
+      ]
     },
     {
-      key: "mass_submerged_B",
-      label: "Submerged Mass (B)",
-      unit: "g",
-      type: "number",
-      placeholder: "0.0",
-      guidance: "Immerse in 77°F water bath for 3–5 minutes and record buoyant weight.",
-      learning: "Archimedes' Principle: buoyant upward force equals the mass of displaced water."
+      id: "ssd_mass",
+      title: "Step 4: Saturated Surface-Dry Mass (C)",
+      description: "Measure surface-dry mass immediately after immersion.",
+      guidance: "Remove from bath, blot surface rapidly with damp towel, and record mass within 15 seconds.",
+      learning: "SSD state captures filled internal voids while removing external surface moisture.",
+      inputs: [
+        { key: "mass_ssd_C", label: "SSD Mass (C)", unit: "g", type: "number", placeholder: "0.0" }
+      ]
     },
     {
-      key: "mass_ssd_C",
-      label: "SSD Mass (C)",
-      unit: "g",
-      type: "number",
-      placeholder: "0.0",
-      guidance: "Blot exterior surface briefly with damp towel and immediately record mass.",
-      learning: "Saturated Surface-Dry (SSD) condition fills internal aggregate voids with water while leaving the exterior surface dry."
-    },
-    {
-      key: "gmm_value",
-      label: "Max Gravity (Gmm)",
-      unit: "",
-      type: "number",
-      placeholder: "0.000",
-      guidance: "Obtained from corresponding Rice Test run for this mix.",
-      learning: "Gmm is zero-void theoretical maximum specific gravity used to determine percentage compaction."
-    },
-    {
-      key: "pqi_density",
-      label: "PQI Gauge Reading",
-      unit: "pcf",
-      type: "number",
-      placeholder: "0.0",
-      guidance: "Non-destructive field density gauge reading taken directly over core site.",
-      learning: "Used to derive daily offset calibration adjustments between gauge readings and core densities."
+      id: "reference_data",
+      title: "Step 5: Reference & Field Comparison Data",
+      description: "Enter maximum theoretical gravity and field gauge readings for compaction analysis.",
+      guidance: "Input corresponding Rice Test Gmm and field PQI gauge reading taken over core site.",
+      learning: "Links lab bulk gravity to target voidless gravity (Gmm) to derive true in-place compaction.",
+      inputs: [
+        { key: "gmm_value", label: "Max Gravity (Gmm)", unit: "", type: "number", placeholder: "0.000" },
+        { key: "pqi_density", label: "PQI Gauge Reading", unit: "pcf", type: "number", placeholder: "0.0" }
+      ]
     }
   ]
 };
 
-// 2. ENGINE & STATE MANAGER
-class ProcedureEngine {
+class WizardEngine {
   constructor(schema) {
     this.schema = schema;
-    this.displayDepth = "custom"; // "speed", "custom", or "learning"
+    this.currentStepIndex = 0;
     this.values = this.loadDraftState() || {
       station_location: "",
       core_id: "",
@@ -91,37 +82,25 @@ class ProcedureEngine {
   }
 
   saveDraftState() {
-    try {
-      localStorage.setItem(`draft_${this.schema.id}`, JSON.stringify(this.values));
-    } catch (e) {
-      console.warn("Could not save state to localStorage", e);
-    }
+    try { localStorage.setItem(`draft_${this.schema.id}`, JSON.stringify(this.values)); } catch (e) {}
   }
 
   loadDraftState() {
     try {
       const saved = localStorage.getItem(`draft_${this.schema.id}`);
       return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { return null; }
   }
 
   saveLedgerState() {
-    try {
-      localStorage.setItem(`ledger_${this.schema.id}`, JSON.stringify(this.ledger));
-    } catch (e) {
-      console.warn("Could not save ledger to localStorage", e);
-    }
+    try { localStorage.setItem(`ledger_${this.schema.id}`, JSON.stringify(this.ledger)); } catch (e) {}
   }
 
   loadLedgerState() {
     try {
       const saved = localStorage.getItem(`ledger_${this.schema.id}`);
-      return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      return [];
-    }
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) { return []; }
   }
 
   updateValue(key, val) {
@@ -154,7 +133,7 @@ class ProcedureEngine {
   commitToBook() {
     const res = this.calculate();
     if (res.Gmb === "—") {
-      alert("Missing core weights. Please enter Dry (A), Submerged (B), and SSD (C) masses.");
+      alert("Missing core weights. Please complete all step inputs.");
       return;
     }
 
@@ -168,52 +147,42 @@ class ProcedureEngine {
 
     this.ledger.push(record);
     this.saveLedgerState();
-    alert(`Result committed to book! Records logged: ${this.ledger.length}`);
+    alert(`Result committed to book! Total logged records: ${this.ledger.length}`);
   }
 }
 
-// 3. SINGLE CANVAS RENDERER
 document.addEventListener("DOMContentLoaded", () => {
-  const engine = new ProcedureEngine(coreDensityProcedure);
+  const engine = new WizardEngine(coreDensityProcedure);
   const workspace = document.getElementById("procedural-workspace");
-  const depthButtons = document.querySelectorAll(".depth-btn");
   const menuButton = document.querySelector(".menu-button");
   const sidebar = document.querySelector(".sidebar");
 
-  if (!workspace) {
-    console.error("Target container #procedural-workspace not found in HTML.");
-    return;
-  }
+  if (!workspace) return;
+  if (menuButton) menuButton.addEventListener("click", () => sidebar.classList.toggle("open"));
 
-  if (menuButton) {
-    menuButton.addEventListener("click", () => sidebar.classList.toggle("open"));
-  }
-
-  // Handle Detail Depth Switcher
-  depthButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
-      depthButtons.forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      engine.displayDepth = btn.getAttribute("data-depth");
-      renderWorkspace();
-    });
-  });
-
-  function renderWorkspace() {
+  function renderWizard() {
+    const step = engine.schema.steps[engine.currentStepIndex];
+    const totalSteps = engine.schema.steps.length;
     const results = engine.calculate();
-    const isLearning = engine.displayDepth === "learning";
-    const isSpeed = engine.displayDepth === "speed";
+    const isLastStep = engine.currentStepIndex === totalSteps - 1;
 
     workspace.innerHTML = `
+      <div style="margin-bottom: 12px; font-size: 0.85rem; opacity: 0.8;">
+        Module: <strong>${engine.schema.parentModule}</strong> &gt; <strong>${engine.schema.submodule}</strong>
+      </div>
+
       <div class="form-card">
-        <h2 style="font-size: 1.1rem; margin-bottom: 16px;">Core Measurements & Observations</h2>
-        
-        <div class="form-grid">
-          ${engine.schema.inputs.map(input => `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h2 style="font-size: 1.1rem; margin: 0;">${step.title}</h2>
+          <span style="font-size: 0.85rem; font-weight: bold;">Step ${engine.currentStepIndex + 1} of ${totalSteps}</span>
+        </div>
+
+        <p style="margin-bottom: 16px; color: #a0a0a0;">${step.description}</p>
+
+        <div class="form-grid" style="margin-bottom: 16px;">
+          ${step.inputs.map(input => `
             <div class="input-block">
-              <label>
-                ${input.label}${input.unit ? `(${input.unit})` : ''}
-              </label>
+              <label>${input.label}${input.unit ? `(${input.unit})` : ''}</label>
               <input 
                 data-key="${input.key}" 
                 class="number-input core-input" 
@@ -221,82 +190,72 @@ document.addEventListener("DOMContentLoaded", () => {
                 placeholder="${input.placeholder}" 
                 value="${engine.values[input.key] ?? ''}"
               >
-
-              ${!isSpeed ? `
-                <details class="disclosure" ${isLearning ? 'open' : ''}>
-                  <summary>Procedural Guidance & Knowledge</summary>
-                  <div class="disclosure-body">
-                    <p style="margin-bottom: 4px;"><strong>Guidance:</strong> ${input.guidance}</p>
-                    <p style="margin-bottom: 0;"><strong>Principle:</strong> ${input.learning}</p>
-                  </div>
-                </details>
-              ` : ''}
             </div>
           `).join('')}
         </div>
+
+        <details class="disclosure" open style="margin-bottom: 16px;">
+          <summary>Step Guidance & Concept</summary>
+          <div class="disclosure-body">
+            <p style="margin-bottom: 4px;"><strong>Action Guidance:</strong> ${step.guidance}</p>
+            <p style="margin-bottom: 0;"><strong>Technical Principle:</strong> ${step.learning}</p>
+          </div>
+        </details>
+
+        <div style="display: flex; gap: 8px; justify-content: space-between;">
+          <button id="prev-btn" class="secondary" ${engine.currentStepIndex === 0 ? 'disabled' : ''}>&larr; Previous Step</button>
+          ${isLastStep ? `
+            <button id="commit-btn" class="primary">Commit Result to Book</button>
+          ` : `
+            <button id="next-btn" class="primary">Next Step &rarr;</button>
+          `}
+        </div>
       </div>
 
-      <div class="results-card">
-        <h2 style="font-size: 1.1rem; margin-bottom: 16px;">Calculated Results</h2>
-        
+      <div class="results-card" style="margin-top: 16px;">
+        <h3 style="font-size: 1rem; margin-bottom: 12px;">Running Calculation Summary</h3>
         <div class="results-grid">
-          <div class="result-item">
-            <span>Displaced Vol (C - B)</span>
-            <strong>${results.volume} cm³</strong>
-          </div>
-          <div class="result-item">
-            <span>Bulk Gravity (Gmb)</span>
-            <strong>${results.Gmb}</strong>
-          </div>
-          <div class="result-item">
-            <span>In-Place Compaction</span>
-            <strong>${results.densityPct}</strong>
-          </div>
-          <div class="result-item">
-            <span>Bulk Density</span>
-            <strong>${results.bulkDensityPcf} pcf</strong>
-          </div>
-          <div class="result-item">
-            <span>PQI Gauge Offset</span>
-            <strong>${results.pqiOffset} pcf</strong>
-          </div>
-        </div>
-
-        ${!isSpeed ? `
-          <details class="disclosure" ${isLearning ? 'open' : ''} style="margin-bottom: 16px;">
-            <summary>Calculation Formulas & Derivations</summary>
-            <div class="disclosure-body">
-              <p style="margin-bottom: 4px;">• <strong>Displaced Volume:</strong> V = C - B</p>
-              <p style="margin-bottom: 4px;">• <strong>Bulk Specific Gravity:</strong> Gmb = A / (C - B)</p>
-              <p style="margin-bottom: 4px;">• <strong>Density %:</strong> (Gmb / Gmm) * 100</p>
-              <p style="margin-bottom: 0;">• <strong>Unit Weight (pcf):</strong> Gmb * 62.245</p>
-            </div>
-          </details>
-        ` : ''}
-
-        <div class="actions">
-          <button id="commit-btn" class="primary">Commit Result to Book</button>
+          <div class="result-item"><span>Displaced Vol</span><strong>${results.volume} cm³</strong></div>
+          <div class="result-item"><span>Bulk Gravity (Gmb)</span><strong>${results.Gmb}</strong></div>
+          <div class="result-item"><span>Compaction %</span><strong>${results.densityPct}</strong></div>
+          <div class="result-item"><span>Bulk Density</span><strong>${results.bulkDensityPcf} pcf</strong></div>
+          <div class="result-item"><span>PQI Offset</span><strong>${results.pqiOffset} pcf</strong></div>
         </div>
       </div>
     `;
 
-    // Rebind Live Calculation Input Listeners
+    // Rebind Input Listeners
     document.querySelectorAll(".core-input").forEach(input => {
       input.addEventListener("input", (e) => {
         const key = e.target.getAttribute("data-key");
         engine.updateValue(key, e.target.value);
-        updateLiveResults();
+        updateLiveSummary();
       });
     });
 
+    // Navigation Controls
+    const prevBtn = document.getElementById("prev-btn");
+    const nextBtn = document.getElementById("next-btn");
     const commitBtn = document.getElementById("commit-btn");
-    if (commitBtn) {
-      commitBtn.addEventListener("click", () => engine.commitToBook());
-    }
+
+    if (prevBtn) prevBtn.addEventListener("click", () => {
+      if (engine.currentStepIndex > 0) {
+        engine.currentStepIndex--;
+        renderWizard();
+      }
+    });
+
+    if (nextBtn) nextBtn.addEventListener("click", () => {
+      if (engine.currentStepIndex < totalSteps - 1) {
+        engine.currentStepIndex++;
+        renderWizard();
+      }
+    });
+
+    if (commitBtn) commitBtn.addEventListener("click", () => engine.commitToBook());
   }
 
-  // Minimal DOM update for live input recalculation
-  function updateLiveResults() {
+  function updateLiveSummary() {
     const res = engine.calculate();
     const items = document.querySelectorAll(".result-item strong");
     if (items.length === 5) {
@@ -308,6 +267,5 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Initial Load Execution
-  renderWorkspace();
+  renderWizard();
 });
