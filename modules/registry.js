@@ -113,6 +113,8 @@
  * Append ?v=1.0.X to force browsers to fetch updated code immediately.
  */
 
+// The registry does not contain the procedure math itself. It is the application's index:
+// "what modules exist, where their files are, and where they belong in navigation/workflow."
 window.QC_MODULES = [
   {
     id: "gmb_core_prep",
@@ -163,6 +165,8 @@ window.QC_MODULES = [
 ];
 
 // Application-level navigation sections
+// Navigation sections describe the different ways the same module metadata can be viewed.
+// The Workday section uses workflow.chronologicalOrder; Testing uses navigation metadata.
 window.QC_NAVIGATION = {
   sections: [
     {
