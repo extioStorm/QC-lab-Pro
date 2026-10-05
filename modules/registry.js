@@ -1,6 +1,6 @@
 /**
  * Master QC Module Registry
- * Defines all installed testing modules for offline PWA navigation.
+ * Maps installed testing modules to their relative script locations and global object keys.
  */
 window.QC_MODULES = [
   {
@@ -9,7 +9,4 @@ window.QC_MODULES = [
     script: "modules/gmb-core-density.js",
     objectName: "gmbCoreDensityModule"
   }
-  // Future modules added here:
-  // { id: "gmm_rice", title: "AASHTO T 209 (Rice Gmm)", script: "modules/gmm-rice-test.js", objectName: "gmmRiceTestModule" },
-  // { id: "sieve_t27", title: "AASHTO T 27 (Washed Sieve)", script: "modules/sieve-analysis.js", objectName: "sieveAnalysisModule" }
 ];
