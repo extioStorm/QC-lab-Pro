@@ -5,7 +5,10 @@
  * and cross-file contracts.
  */
 
+// This class is the application's controller. It holds the current module, the user's entered data,
+// the current mode/step, and the rules for turning that data into HTML.
 class QCLabFramework {
+  // Create the controller and remember where its generated UI should be placed.
   constructor(rootContainerId) {
     this.container = document.getElementById(rootContainerId);
     this.activeModule = null;
@@ -23,6 +26,8 @@ class QCLabFramework {
     this.attachedCalculations = new Set();
   }
 
+  // Switch the app to a different procedure/module. This resets the step and training state,
+  // then restores that module's saved draft before drawing it on screen.
   mountModule(moduleObj) {
     if (!moduleObj || !moduleObj.id) {
       console.error("Invalid module object passed to mountModule()");
@@ -46,6 +51,7 @@ class QCLabFramework {
     this.render();
   }
 
+  // Change between Speed, Interactive, and Training behavior. Changing mode restarts the step wizard.
   setMode(newMode) {
     if (["speed", "interactive", "training"].includes(newMode)) {
       this.mode = newMode;
@@ -54,6 +60,7 @@ class QCLabFramework {
     }
   }
 
+  // Move the Interactive-mode wizard to another step, but never outside the module's step list.
   setStep(newStepIndex) {
     if (!this.activeModule || !this.activeModule.steps) return;
     if (newStepIndex >= 0 && newStepIndex < this.activeModule.steps.length) {
@@ -62,6 +69,7 @@ class QCLabFramework {
     }
   }
 
+  // Read this module's saved form values from the browser. Each module gets its own storage key.
   loadDraftState() {
     if (!this.activeModule) return;
     const storageKey = `QC_DRAFT_${this.activeModule.id}`;
@@ -78,12 +86,14 @@ class QCLabFramework {
     }
   }
 
+  // Save the current form values locally so leaving/reloading the page does not erase the draft.
   saveDraftState() {
     if (!this.activeModule) return;
     const storageKey = `QC_DRAFT_${this.activeModule.id}`;
     localStorage.setItem(storageKey, JSON.stringify(this.formData));
   }
 
+  // Called whenever an input changes. Update memory, save it, and redraw immediately in Speed mode.
   updateFieldValue(fieldId, value) {
     this.formData[fieldId] = value;
     this.saveDraftState();
@@ -94,6 +104,7 @@ class QCLabFramework {
     }
   }
 
+  // In Interactive mode, mark the currently calculated results as officially attached/committed.
   attachCalculation() {
     if (!this.activeModule) return;
     this.attachedCalculations.add("ALL_COMPUTED");
@@ -101,10 +112,13 @@ class QCLabFramework {
     this.render();
   }
 
+  // Turn a human-readable label into something safe to use inside an HTML element id.
   sanitizeId(str) {
     return String(str).replace(/[^a-zA-Z0-9_-]/g, "_");
   }
 
+  // Training mode uses this to compare the user's hand calculation with the module's answer.
+  // A match within 0.005 is considered correct and then offers a Commit button.
   checkTrainingGuess(fieldLabel, targetValue) {
     const safeId = this.sanitizeId(fieldLabel);
     const guessInput = document.getElementById(`guess-input-${safeId}`);
@@ -143,6 +157,7 @@ class QCLabFramework {
     }
   }
 
+  // Once a training answer is accepted, mark the calculated output as committed and redraw.
   commitTrainingValue(fieldLabel, targetValue) {
     this.attachedCalculations.add(fieldLabel);
     this.attachedCalculations.add("ALL_COMPUTED");
@@ -150,6 +165,8 @@ class QCLabFramework {
     this.render();
   }
 
+  // Rebuild the visible module screen from scratch using the current state and module data.
+  // This is the central rendering pipeline: module.compute() → procedure UI → inputs → results.
   render() {
     if (!this.container) return;
 
@@ -159,6 +176,8 @@ class QCLabFramework {
     }
 
     const m = this.activeModule;
+    // The module owns the actual laboratory math. The framework only supplies the current form data
+    // and then displays whatever the module returns.
     const computedData = m.compute ? m.compute(this.formData) : [];
 
     this.container.innerHTML = `
@@ -193,9 +212,13 @@ class QCLabFramework {
     `;
   }
 
+  // Convert a module's field definitions into actual HTML inputs.
+  // Interactive mode only shows fields assigned to the current step; other modes show all fields.
   renderInputFields(moduleObj) {
     const fields = moduleObj.fields || [];
     
+    // In Interactive mode, only show fields belonging to the current wizard step.
+    // Fields without stepNum are always shown. Speed/Training modes show every field.
     // In Interactive mode, filter inputs to current step if specified, or render all
     const activeFields = (this.mode === "interactive" && moduleObj.steps && moduleObj.steps.length > 0)
       ? fields.filter(f => !f.stepNum || f.stepNum === (this.stepIndex + 1))
@@ -219,6 +242,8 @@ class QCLabFramework {
     `).join('');
   }
 
+  // Render the procedure instructions differently for each application mode.
+  // Speed = compact overview; Interactive = one-step wizard; Training = full learning list.
   renderProcedureSteps(moduleObj) {
     if (!moduleObj.steps || moduleObj.steps.length === 0) return '';
 
@@ -282,6 +307,8 @@ class QCLabFramework {
     }
   }
 
+  // Turn whatever the module's compute() function returned into the appropriate result UI.
+  // The expected module output can be either a simple array or an object containing results/stepMath.
   renderCalculatedSection(computedData) {
     const results = Array.isArray(computedData) ? computedData : (computedData.results || []);
     const stepMath = computedData.stepMath || [];
@@ -291,6 +318,7 @@ class QCLabFramework {
       return `<p style="opacity: 0.6;">No calculations defined for this module.</p>`;
     }
 
+    // SPEED MODE: show the computed values immediately, with no commit gate.
     // SPEED MODE: Live output cards
     if (this.mode === "speed") {
       return `
@@ -305,6 +333,7 @@ class QCLabFramework {
       `;
     }
 
+    // INTERACTIVE MODE: reveal the arithmetic only after valid inputs exist, then require an explicit commit.
     // INTERACTIVE MODE: Exposed Whiteboard Hand Math
     if (this.mode === "interactive") {
       const isAttached = this.attachedCalculations.has("ALL_COMPUTED");
@@ -357,6 +386,7 @@ class QCLabFramework {
       `;
     }
 
+    // TRAINING MODE: hide the official values until the user practices each calculation and commits them.
     // TRAINING MODE: Practice guess validation
     if (this.mode === "training") {
       const isAttached = this.attachedCalculations.has("ALL_COMPUTED");
