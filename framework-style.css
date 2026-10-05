@@ -397,3 +397,101 @@ body {
 .fw-btn-primary:hover { background-color: var(--accent-green-hover); }
 .fw-btn-secondary { background-color: #333333; color: var(--text-main); }
 .fw-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+
+/* Shared project/test context controls */
+.fw-context-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.18);
+  font-size: 0.85rem;
+}
+
+.fw-context-control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fw-context-control label {
+  font-weight: 600;
+}
+
+.fw-context-control input,
+.fw-context-control select {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: var(--input-bg);
+  color: inherit;
+}
+
+.fw-context-control small {
+  opacity: 0.7;
+}
+
+.fw-empty-state {
+  opacity: 0.65;
+  font-size: 0.85rem;
+}
+
+.fw-whiteboard-container {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.fw-math-step {
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-left: 3px solid #81c784;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+}
+
+.fw-math-formula {
+  margin: 4px 0;
+  opacity: 0.75;
+  font-family: monospace;
+}
+
+.fw-attach-row {
+  margin-top: 14px;
+  text-align: right;
+}
+
+.fw-success {
+  font-weight: 600;
+}
+
+.fw-training-row {
+  margin-bottom: 12px;
+}
+
+.fw-training-input-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 5px;
+}
+
+.fw-training-input-row input {
+  flex: 1;
+}
+
+.fw-training-success {
+  margin-top: 8px;
+  font-size: 0.85rem;
+}
+
+.fw-training-warning {
+  margin-top: 8px;
+  font-size: 0.85rem;
+}
