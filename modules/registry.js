@@ -115,12 +115,35 @@
 
 window.QC_MODULES = [
   {
+    id: "gmb_core_prep",
+    title: "Field Core Drilling & Prep",
+    script: "modules/gmb-core-prep.js?v=1.0.0",
+    objectName: "gmbCorePrepModule",
+
+    // Standard Lab Hierarchy Navigation
+    navigation: {
+      section: "testing",
+      category: "field_sampling",
+      categoryTitle: "Field Sampling & Prep",
+      procedure: "core_prep",
+      procedureTitle: "Core Extraction",
+      sequence: 5
+    },
+
+    // Workday Workflow & Data Ordering
+    workflow: {
+      prequels: [],
+      sequels: ["gmb_core_density"],
+      chronologicalOrder: 10
+    }
+  },
+  {
     id: "gmb_core_density",
     title: "AASHTO T 166 (Core Gmb)",
     script: "modules/gmb-core-density.js?v=1.0.3",
     objectName: "gmbCoreDensityModule",
 
-    // Navigation metadata. This is descriptive data, not a second module.
+    // Standard Lab Hierarchy Navigation
     navigation: {
       section: "testing",
       category: "volumetric_properties",
@@ -128,19 +151,25 @@ window.QC_MODULES = [
       procedure: "aashto_t166",
       procedureTitle: "AASHTO T 166",
       sequence: 10
+    },
+
+    // Workday Workflow & Data Ordering
+    workflow: {
+      prequels: ["gmb_core_prep"],
+      sequels: [],
+      chronologicalOrder: 30
     }
   }
 ];
 
-// Application-level navigation areas. These are intentionally lightweight
-// placeholders until their underlying procedures/features are implemented.
+// Application-level navigation sections
 window.QC_NAVIGATION = {
   sections: [
     {
       id: "workday",
       title: "Workday",
       sequence: 10,
-      items: []
+      childrenFrom: "QC_MODULES_WORKDAY"
     },
     {
       id: "testing",
