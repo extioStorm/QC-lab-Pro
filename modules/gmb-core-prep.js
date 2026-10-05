@@ -5,6 +5,8 @@
  * AI CONTEXT: See modules/registry.js for application architecture
  * and cross-file contracts.
  */
+// This module represents the field-side work that happens before the laboratory T 166 test.
+// It stores the location/thickness measurements and exposes a simple readiness result.
 window.gmbCorePrepModule = {
   id: "gmb_core_prep",
   title: "Field Core Drilling & Prep",
@@ -34,6 +36,7 @@ window.gmbCorePrepModule = {
   },
 
   // Raw Input Measurements
+  // Raw field measurements entered by the technician.
   fields: [
     {
       id: "station_location",
@@ -54,6 +57,7 @@ window.gmbCorePrepModule = {
   ],
 
   // Step-by-step procedural breakdown
+  // Procedure guidance for the field technician. These steps do not perform calculations.
   steps: [
     {
       num: 1,
@@ -72,10 +76,13 @@ window.gmbCorePrepModule = {
   ],
 
   // Compute Engine
+  // Decide whether the core has enough information to be considered ready for the laboratory step.
   compute: function(data) {
+    // Location is informational; thickness is the measurement that determines readiness.
     const loc = data.station_location || "—";
     const thick = parseFloat(data.core_thickness);
 
+    // A positive numeric thickness means the minimum required prep measurement is present.
     const isReady = !isNaN(thick) && thick > 0;
 
     return [
