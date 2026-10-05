@@ -1,33 +1,29 @@
 /**
  * QC Lab Framework Core Engine
- * 
- * AI CONTEXT: See modules/registry.js for application architecture
- * and cross-file contracts.
+ *
+ * The framework is intentionally NOT the laboratory database.
+ *
+ * Responsibilities:
+ *   1. Control the screen and workflow.
+ *   2. Ask the active module what it needs displayed.
+ *   3. Read/write values through QC_DATA.
+ *   4. Keep navigation/mode state.
+ *
+ * The shared project data lives in data-model.js.
+ * A module describes a procedure and performs its procedure-specific
+ * calculations against the shared records.
  */
 
-// This class is the application's controller. It holds the current module, the user's entered data,
-// the current mode/step, and the rules for turning that data into HTML.
 class QCLabFramework {
-  // Create the controller and remember where its generated UI should be placed.
   constructor(rootContainerId) {
     this.container = document.getElementById(rootContainerId);
     this.activeModule = null;
-    
-    // Application Modes: "speed" | "interactive" | "training"
-    this.mode = "interactive"; 
+    this.mode = "interactive";
     this.stepIndex = 0;
-
-    // DATA ARCHITECTURE
-    this.formData = {};
-    this.stagedData = {};
-    this.trainingGuesses = {};
-    
-    // Explicitly tracked calculated fields attached to ground truth
     this.attachedCalculations = new Set();
+    this.trainingGuesses = {};
   }
 
-  // Switch the app to a different procedure/module. This resets the step and training state,
-  // then restores that module's saved draft before drawing it on screen.
   mountModule(moduleObj) {
     if (!moduleObj || !moduleObj.id) {
       console.error("Invalid module object passed to mountModule()");
@@ -39,109 +35,107 @@ class QCLabFramework {
     this.attachedCalculations.clear();
     this.trainingGuesses = {};
 
-    // Restore or initialize draft state for this module
-    this.loadDraftState();
-
-    // Dynamically sync header module title if header element exists
-    const titleEl = document.getElementById("active-module-title");
-    if (titleEl) {
-      titleEl.textContent = moduleObj.title;
-    }
-
     this.render();
   }
 
-  // Change between Speed, Interactive, and Training behavior. Changing mode restarts the step wizard.
   setMode(newMode) {
     if (["speed", "interactive", "training"].includes(newMode)) {
       this.mode = newMode;
-      this.stepIndex = 0; // Reset step progression when changing modes
+      this.stepIndex = 0;
       this.render();
     }
   }
 
-  // Move the Interactive-mode wizard to another step, but never outside the module's step list.
   setStep(newStepIndex) {
-    if (!this.activeModule || !this.activeModule.steps) return;
+    if (!this.activeModule?.steps) return;
     if (newStepIndex >= 0 && newStepIndex < this.activeModule.steps.length) {
       this.stepIndex = newStepIndex;
       this.render();
     }
   }
 
-  // Read this module's saved form values from the browser. Each module gets its own storage key.
-  loadDraftState() {
-    if (!this.activeModule) return;
-    const storageKey = `QC_DRAFT_${this.activeModule.id}`;
-    const saved = localStorage.getItem(storageKey);
-    
-    if (saved) {
-      try {
-        this.formData = JSON.parse(saved);
-      } catch (e) {
-        this.formData = {};
-      }
-    } else {
-      this.formData = {};
-    }
+  /**
+   * The current field value comes from the shared project record.
+   * There is no module-specific formData copy anymore.
+   */
+  getFieldValue(field) {
+    if (!window.QC_DATA) return "";
+    return QC_DATA.getField(field.dataTarget || "core.measurements", field.id) ?? "";
   }
 
-  // Save the current form values locally so leaving/reloading the page does not erase the draft.
-  saveDraftState() {
-    if (!this.activeModule) return;
-    const storageKey = `QC_DRAFT_${this.activeModule.id}`;
-    localStorage.setItem(storageKey, JSON.stringify(this.formData));
-  }
-
-  // Called whenever an input changes. Update memory, save it, and redraw immediately in Speed mode.
   updateFieldValue(fieldId, value) {
-    this.formData[fieldId] = value;
-    this.saveDraftState();
+    const field = (this.activeModule?.fields || []).find(f => f.id === fieldId);
+    if (!field || !window.QC_DATA) return;
 
-    // Continuous updates in Speed Mode
+    QC_DATA.setField(
+      field.dataTarget || "core.measurements",
+      field.dataKey || field.id,
+      value
+    );
+
     if (this.mode === "speed") {
       this.render();
     }
   }
 
-  // In Interactive mode, mark the currently calculated results as officially attached/committed.
-  attachCalculation() {
-    if (!this.activeModule) return;
-    this.attachedCalculations.add("ALL_COMPUTED");
-    this.saveDraftState();
-    this.render();
+  /**
+   * Recalculate the active procedure and let it write its calculated values
+   * back into the shared data model.
+   *
+   * This is deliberately different from the old:
+   *     formData -> compute() -> temporary results
+   *
+   * The new model is:
+   *     shared records -> procedure calculation -> shared records
+   *
+   * The calculation is still explicit; nothing automatically recalculates
+   * because some unrelated field changed unless the user/module asks it to.
+   */
+  calculateActiveModule() {
+    if (!this.activeModule || typeof this.activeModule.calculate !== "function") {
+      return { isComplete: false, results: [] };
+    }
+
+    return this.activeModule.calculate(QC_DATA);
   }
 
-  // Turn a human-readable label into something safe to use inside an HTML element id.
+  attachCalculation() {
+    if (!this.activeModule) return;
+
+    const calculated = this.calculateActiveModule();
+
+    if (calculated.isComplete !== false) {
+      this.attachedCalculations.add("ALL_COMPUTED");
+      this.render();
+    }
+  }
+
   sanitizeId(str) {
     return String(str).replace(/[^a-zA-Z0-9_-]/g, "_");
   }
 
-  // Training mode uses this to compare the user's hand calculation with the module's answer.
-  // A match within 0.005 is considered correct and then offers a Commit button.
   checkTrainingGuess(fieldLabel, targetValue) {
     const safeId = this.sanitizeId(fieldLabel);
     const guessInput = document.getElementById(`guess-input-${safeId}`);
     const feedbackEl = document.getElementById(`guess-feedback-${safeId}`);
-    
+
     if (!guessInput || !feedbackEl) return;
 
     const userGuess = parseFloat(guessInput.value);
     const target = parseFloat(targetValue);
 
     if (isNaN(userGuess)) {
-      feedbackEl.innerHTML = `<span style="color: #f44336; font-size: 0.85rem;">Please enter a numeric guess.</span>`;
+      feedbackEl.textContent = "Please enter a numeric guess.";
       return;
     }
 
     const diff = Math.abs(userGuess - target);
-    const isMatched = diff <= 0.005;
 
-    if (isMatched) {
+    if (diff <= 0.005) {
       feedbackEl.innerHTML = `
-        <div style="color: #81c784; margin-top: 8px; font-size: 0.85rem;">
+        <div class="fw-training-success">
           ✓ Correct! Precision match within ${diff.toFixed(4)}.
-          <button type="button" class="fw-btn fw-btn-primary" style="margin-left: 8px; padding: 4px 8px; font-size: 0.75rem;" 
+          <button type="button" class="fw-btn fw-btn-primary"
                   onclick="QC.commitTrainingValue('${fieldLabel}', '${targetValue}')">
             Commit
           </button>
@@ -150,23 +144,33 @@ class QCLabFramework {
     } else {
       const direction = userGuess > target ? "high" : "low";
       feedbackEl.innerHTML = `
-        <div style="color: #ffb74d; margin-top: 8px; font-size: 0.85rem;">
-          ⚠️ Off by ${diff.toFixed(4)} (${direction}). Double-check your calculation!
+        <div class="fw-training-warning">
+          ⚠️ Off by ${diff.toFixed(4)} (${direction}). Double-check your calculation.
         </div>
       `;
     }
   }
 
-  // Once a training answer is accepted, mark the calculated output as committed and redraw.
-  commitTrainingValue(fieldLabel, targetValue) {
-    this.attachedCalculations.add(fieldLabel);
+  commitTrainingValue() {
     this.attachedCalculations.add("ALL_COMPUTED");
-    this.saveDraftState();
     this.render();
   }
 
-  // Rebuild the visible module screen from scratch using the current state and module data.
-  // This is the central rendering pipeline: module.compute() → procedure UI → inputs → results.
+  /**
+   * Context controls operate on the shared data model, not on a module.
+   */
+  setCoreContext(coreId) {
+    if (!coreId) return;
+    QC_DATA.setContext({ coreId: String(coreId) });
+    this.render();
+  }
+
+  setGmmSource(testId) {
+    if (!QC_DATA.getCore()) return;
+    QC_DATA.setCoreReference("gmmTestId", testId);
+    this.render();
+  }
+
   render() {
     if (!this.container) return;
 
@@ -176,78 +180,113 @@ class QCLabFramework {
     }
 
     const m = this.activeModule;
-    // The module owns the actual laboratory math. The framework only supplies the current form data
-    // and then displays whatever the module returns.
-    const computedData = m.compute ? m.compute(this.formData) : [];
+
+    // Calculations are explicit. Rendering does not silently invent a new
+    // copy of the application's data.
+    const calculatedData = this.calculateActiveModule();
 
     this.container.innerHTML = `
       <div class="fw-card">
-        <!-- Module Header & Mode Selector -->
+        ${this.renderContextBar()}
+
         <div class="fw-module-header">
           <div class="fw-header-titles">
             <h2>${m.title}</h2>
-            <span class="fw-header-sub">${m.submodule || m.parentModule || ''}</span>
+            <span class="fw-header-sub">${m.submodule || m.parentModule || ""}</span>
           </div>
-          
+
           <div class="fw-mode-selector">
-            <button type="button" class="fw-btn ${this.mode === 'speed' ? 'fw-btn-primary' : ''}" onclick="QC.setMode('speed')">Speed</button>
-            <button type="button" class="fw-btn ${this.mode === 'interactive' ? 'fw-btn-primary' : ''}" onclick="QC.setMode('interactive')">Interactive</button>
-            <button type="button" class="fw-btn ${this.mode === 'training' ? 'fw-btn-primary' : ''}" onclick="QC.setMode('training')">Training</button>
+            <button type="button" class="fw-btn ${this.mode === "speed" ? "fw-btn-primary" : ""}" onclick="QC.setMode("speed")">Speed</button>
+            <button type="button" class="fw-btn ${this.mode === "interactive" ? "fw-btn-primary" : ""}" onclick="QC.setMode("interactive")">Interactive</button>
+            <button type="button" class="fw-btn ${this.mode === "training" ? "fw-btn-primary" : ""}" onclick="QC.setMode("training")">Training</button>
           </div>
         </div>
 
-        <!-- Mode-Specific Step Guidance (Interactive / Training) -->
         ${this.renderProcedureSteps(m)}
 
-        <!-- Input Fields -->
         <h3 class="fw-section-heading">Raw Measured Inputs</h3>
         <div class="fw-grid">
           ${this.renderInputFields(m)}
         </div>
 
-        <!-- Calculated Outputs -->
         <h3 class="fw-section-heading">Calculated Results</h3>
-        ${this.renderCalculatedSection(computedData)}
+        ${this.renderCalculatedSection(calculatedData)}
       </div>
     `;
   }
 
-  // Convert a module's field definitions into actual HTML inputs.
-  // Interactive mode only shows fields assigned to the current step; other modes show all fields.
+  renderContextBar() {
+    const project = QC_DATA.getProject();
+    const session = QC_DATA.getSession();
+    const core = QC_DATA.getCore();
+    const gmm = QC_DATA.getApplicableGmm();
+    const coreIds = Object.keys(session?.cores || {});
+
+    return `
+      <div class="fw-context-bar">
+        <div>
+          <strong>Project:</strong> ${project?.name || QC_DATA.context.projectId}
+        </div>
+        <div>
+          <strong>Session:</strong> ${session?.label || QC_DATA.context.sessionId}
+        </div>
+        <div class="fw-context-control">
+          <label for="qc-core-id">Core</label>
+          <input id="qc-core-id" type="text"
+                 value="${core?.id || ""}"
+                 placeholder="e.g. 457"
+                 onchange="QC.setCoreContext(this.value)">
+          ${coreIds.length ? `<small>Existing: ${coreIds.join(", ")}</small>` : ""}
+        </div>
+        <div class="fw-context-control">
+          <label for="qc-gmm-source">Applicable GMM source</label>
+          <select id="qc-gmm-source" onchange="QC.setGmmSource(this.value)">
+            <option value="">Project/specification value</option>
+            ${Object.entries(QC_DATA.getRiceTests()).map(([id, test]) => `
+              <option value="${id}" ${core?.references?.gmmTestId === id ? "selected" : ""}>
+                ${test.label || id} (${test.gmm ?? "pending"})
+              </option>
+            `).join("")}
+          </select>
+          <small>${gmm ? `Using ${gmm.sourceLabel}: ${gmm.value}` : "No Rice/GMM test linked yet."}</small>
+        </div>
+      </div>
+    `;
+  }
+
   renderInputFields(moduleObj) {
     const fields = moduleObj.fields || [];
-    
-    // In Interactive mode, only show fields belonging to the current wizard step.
-    // Fields without stepNum are always shown. Speed/Training modes show every field.
-    // In Interactive mode, filter inputs to current step if specified, or render all
-    const activeFields = (this.mode === "interactive" && moduleObj.steps && moduleObj.steps.length > 0)
-      ? fields.filter(f => !f.stepNum || f.stepNum === (this.stepIndex + 1))
-      : fields;
+
+    const activeFields =
+      this.mode === "interactive" && moduleObj.steps?.length
+        ? fields.filter(f => !f.stepNum || f.stepNum === this.stepIndex + 1)
+        : fields;
+
+    if (!QC_DATA.getCore()) {
+      return `<p class="fw-empty-state">Enter a Core number above before entering laboratory measurements.</p>`;
+    }
 
     if (activeFields.length === 0) {
-      return `<p style="opacity: 0.6; font-size: 0.85rem;">No input fields required for this step.</p>`;
+      return `<p class="fw-empty-state">No input fields required for this step.</p>`;
     }
 
     return activeFields.map(f => `
       <div class="fw-input-group">
         <label for="field-${f.id}">
-          ${f.label}${f.unit ? `<span class="fw-field-unit"> (${f.unit})</span>` : ''}
+          ${f.label}${f.unit ? `<span class="fw-field-unit"> (${f.unit})</span>` : ""}
         </label>
         <input id="field-${f.id}"
-               type="${f.type || 'text'}" 
-               value="${this.formData[f.id] || ''}" 
-               placeholder="${f.placeholder || ''}" 
+               type="${f.type || "text"}"
+               value="${this.getFieldValue(f)}"
+               placeholder="${f.placeholder || ""}"
                oninput="QC.updateFieldValue('${f.id}', this.value)">
       </div>
-    `).join('');
+    `).join("");
   }
 
-  // Render the procedure instructions differently for each application mode.
-  // Speed = compact overview; Interactive = one-step wizard; Training = full learning list.
   renderProcedureSteps(moduleObj) {
-    if (!moduleObj.steps || moduleObj.steps.length === 0) return '';
+    if (!moduleObj.steps?.length) return "";
 
-    // SPEED MODE: Compact overview of steps
     if (this.mode === "speed") {
       return `
         <details class="fw-disclosure">
@@ -255,16 +294,15 @@ class QCLabFramework {
           <div class="fw-disclosure-body">
             ${moduleObj.steps.map(s => `
               <div class="fw-step-item">
-                <strong>Step ${s.num}:${s.title}</strong>
+                <strong>Step ${s.num}: ${s.title}</strong>
                 <p>${s.description}</p>
               </div>
-            `).join('')}
+            `).join("")}
           </div>
         </details>
       `;
     }
 
-    // INTERACTIVE MODE: Step-by-Step wizard progression
     if (this.mode === "interactive") {
       const currentStep = moduleObj.steps[this.stepIndex] || moduleObj.steps[0];
       const isFirst = this.stepIndex === 0;
@@ -277,49 +315,53 @@ class QCLabFramework {
             <strong class="fw-step-title">${currentStep.title}</strong>
           </div>
           <p class="fw-step-desc">${currentStep.description}</p>
-          ${currentStep.guidance ? `<div class="fw-step-guidance">📋 ${currentStep.guidance}</div>` : ''}
-          
+          ${currentStep.guidance ? `<div class="fw-step-guidance">📋 ${currentStep.guidance}</div>` : ""}
           <div class="fw-step-nav">
-            <button type="button" class="fw-btn fw-btn-secondary" ${isFirst ? 'disabled' : ''} onclick="QC.setStep(${this.stepIndex - 1})">
-              ◄ Previous
-            </button>
-            <button type="button" class="fw-btn fw-btn-primary" ${isLast ? 'disabled' : ''} onclick="QC.setStep(${this.stepIndex + 1})">
-              Next Step ►
-            </button>
+            <button type="button" class="fw-btn fw-btn-secondary" ${isFirst ? "disabled" : ""} onclick="QC.setStep(${this.stepIndex - 1})">◄ Previous</button>
+            <button type="button" class="fw-btn fw-btn-primary" ${isLast ? "disabled" : ""} onclick="QC.setStep(${this.stepIndex + 1})">Next Step ►</button>
           </div>
         </div>
       `;
     }
 
-    // TRAINING MODE: Full list with learning callouts
     if (this.mode === "training") {
       return `
         <div class="fw-steps-list">
           <h3 class="fw-section-heading">Training & Procedure Guidance</h3>
           ${moduleObj.steps.map(s => `
             <div class="fw-step-item fw-learning-block">
-              <strong>Step ${s.num}:${s.title}</strong>
-              <p>${s.description}</p>${s.learning ? `<div class="fw-learning-note">💡 <em>${s.learning}</em></div>` : ''}
+              <strong>Step ${s.num}: ${s.title}</strong>
+              <p>${s.description}</p>
+              ${s.learning ? `<div class="fw-learning-note">💡 <em>${s.learning}</em></div>` : ""}
             </div>
-          `).join('')}
+          `).join("")}
         </div>
       `;
     }
+
+    return "";
   }
 
-  // Turn whatever the module's compute() function returned into the appropriate result UI.
-  // The expected module output can be either a simple array or an object containing results/stepMath.
-  renderCalculatedSection(computedData) {
-    const results = Array.isArray(computedData) ? computedData : (computedData.results || []);
-    const stepMath = computedData.stepMath || [];
-    const isComplete = computedData.isComplete;
+  renderCalculatedSection(calculatedData) {
+    const results = Array.isArray(calculatedData)
+      ? calculatedData
+      : (calculatedData?.results || []);
 
-    if (!results || results.length === 0) {
-      return `<p style="opacity: 0.6;">No calculations defined for this module.</p>`;
+    const stepMath = calculatedData?.stepMath || [];
+    const isComplete = calculatedData?.isComplete !== false;
+
+    if (!results.length) {
+      return `<p class="fw-empty-state">No calculated values defined for this module.</p>`;
     }
 
-    // SPEED MODE: show the computed values immediately, with no commit gate.
-    // SPEED MODE: Live output cards
+    if (calculatedData?.error) {
+      return `
+        <div class="fw-detached-banner">
+          <p style="margin:0;">${calculatedData.error}</p>
+        </div>
+      `;
+    }
+
     if (this.mode === "speed") {
       return `
         <div class="fw-results-grid">
@@ -328,66 +370,51 @@ class QCLabFramework {
               <span class="fw-result-label">${res.label}</span>
               <span class="fw-result-value">${res.value}</span>
             </div>
-          `).join('')}
+          `).join("")}
         </div>
       `;
     }
 
-    // INTERACTIVE MODE: reveal the arithmetic only after valid inputs exist, then require an explicit commit.
-    // INTERACTIVE MODE: Exposed Whiteboard Hand Math
     if (this.mode === "interactive") {
-      const isAttached = this.attachedCalculations.has("ALL_COMPUTED");
-
       if (!isComplete) {
         return `
           <div class="fw-detached-banner">
-            <p style="margin: 0;">Fill in all required weights above to reveal step-by-step calculations.</p>
+            <p style="margin:0;">Fill in the required measurements above to reveal the explicit calculation steps.</p>
           </div>
         `;
       }
 
-      return `
-        <div class="fw-whiteboard-container" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
-          <h4 style="margin: 0 0 12px 0; color: #81c784; font-size: 0.95rem;">🧮 Interactive Step-by-Step Hand Math</h4>
-          
-          <div style="display: flex; flex-direction: column; gap: 12px;">
-            ${stepMath.map(m => `
-              <div style="background: rgba(255,255,255,0.04); border-left: 3px solid #81c784; padding: 10px 12px; border-radius: 4px;">
-                <div style="font-weight: 600; font-size: 0.85rem; color: #e0e0e0; margin-bottom: 4px;">${m.stepName}</div>
-                <div style="font-size: 0.8rem; color: var(--text-muted); font-family: monospace;">Formula: ${m.formula}</div>
-                <div style="font-size: 0.9rem; margin-top: 4px; font-family: monospace; color: #fff;">
-                  ${m.calculation} = <strong style="color: #81c784; font-size: 1rem;">${m.result}</strong>
-                </div>
-              </div>
-            `).join('')}
-          </div>
+      const isAttached = this.attachedCalculations.has("ALL_COMPUTED");
 
-          <div style="margin-top: 16px; text-align: right;">
-            ${!isAttached ? `
-              <button type="button" class="fw-btn fw-btn-primary" onclick="QC.attachCalculation()">
-                ⚡ Compute & Attach Results
-              </button>
-            ` : `
-              <span style="color: #81c784; font-weight: 600; font-size: 0.88rem;">
-                ✓ Results Attached to Official Record
-              </span>
-            `}
+      return `
+        <div class="fw-whiteboard-container">
+          <h4>🧮 Explicit Calculation Steps</h4>
+          ${stepMath.map(step => `
+            <div class="fw-math-step">
+              <strong>${step.stepName}</strong>
+              <div class="fw-math-formula">${step.formula}</div>
+              <div>${step.calculation} = <strong>${step.result}</strong></div>
+            </div>
+          `).join("")}
+
+          <div class="fw-attach-row">
+            ${isAttached
+              ? `<span class="fw-success">✓ Results attached to the shared project record.</span>`
+              : `<button type="button" class="fw-btn fw-btn-primary" onclick="QC.attachCalculation()">⚡ Attach Results</button>`}
           </div>
         </div>
 
         <div class="fw-results-grid">
           ${results.map(res => `
-            <div class="fw-result-card ${isAttached ? 'fw-result-active' : ''}">
+            <div class="fw-result-card ${isAttached ? "fw-result-active" : ""}">
               <span class="fw-result-label">${res.label}</span>
-              <span class="fw-result-value ${isAttached ? '' : 'fw-value-attached'}">${isAttached ? res.value : 'Pending Commit'}</span>
+              <span class="fw-result-value">${isAttached ? res.value : "Pending Attach"}</span>
             </div>
-          `).join('')}
+          `).join("")}
         </div>
       `;
     }
 
-    // TRAINING MODE: hide the official values until the user practices each calculation and commits them.
-    // TRAINING MODE: Practice guess validation
     if (this.mode === "training") {
       const isAttached = this.attachedCalculations.has("ALL_COMPUTED");
 
@@ -399,7 +426,7 @@ class QCLabFramework {
                 <span class="fw-result-label">${res.label} (Verified)</span>
                 <span class="fw-result-value">${res.value}</span>
               </div>
-            `).join('')}
+            `).join("")}
           </div>
         `;
       }
@@ -408,20 +435,23 @@ class QCLabFramework {
         <div class="fw-training-container">
           <h4 class="fw-training-title">🎓 Practice Calculation Test</h4>
           ${results.map(res => {
+            if (res.numericValue === undefined) return "";
             const safeId = this.sanitizeId(res.label);
             return `
-              <div style="margin-bottom: 12px;">
-                <label style="display: block; font-size: 0.85rem; margin-bottom: 4px;">Enter hand calculation for <strong>${res.label}</strong>:</label>
-                <div style="display: flex; gap: 8px;">
-                  <input type="number" step="any" id="guess-input-${safeId}" placeholder="Your calculated guess..." style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--input-bg); color: #fff;">
-                  <button type="button" class="fw-btn fw-btn-primary" onclick="QC.checkTrainingGuess('${res.label}', '${res.value}')">Check</button>
+              <div class="fw-training-row">
+                <label>Enter hand calculation for <strong>${res.label}</strong>:</label>
+                <div class="fw-training-input-row">
+                  <input type="number" step="any" id="guess-input-${safeId}" placeholder="Your answer...">
+                  <button type="button" class="fw-btn fw-btn-primary" onclick="QC.checkTrainingGuess('${res.label}', '${res.numericValue}')">Check</button>
                 </div>
                 <div id="guess-feedback-${safeId}"></div>
               </div>
             `;
-          }).join('')}
+          }).join("")}
         </div>
       `;
     }
+
+    return "";
   }
 }
