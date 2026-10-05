@@ -1,3 +1,9 @@
+<!--
+  QC Lab Procedural App - Entry Point
+  
+  AI CONTEXT: See modules/registry.js for application architecture
+  and cross-file contracts.
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -179,4 +185,122 @@
               });
             }
 
-            categoryGroups.
+            categoryGroups.get(categoryId).modules.push(item);
+          }
+
+          const sortedCategories = [...categoryGroups.values()]
+            .sort((a, b) => a.sequence - b.sequence);
+
+          const categoriesChildren = document.createElement("div");
+          categoriesChildren.className = "nav-group-children";
+
+          for (const category of sortedCategories) {
+            const catGroup = document.createElement("div");
+            catGroup.className = "nav-category expanded";
+
+            const catTitle = createNavItem(
+              category.title,
+              "nav-category-title nav-indent-1",
+              () => catGroup.classList.toggle("expanded")
+            );
+            catTitle.setAttribute("aria-expanded", "true");
+            catGroup.appendChild(catTitle);
+
+            const catChildren = document.createElement("div");
+            catChildren.className = "nav-category-children";
+
+            category.modules.forEach(item => {
+              const moduleButton = createNavItem(
+                item.title,
+                "nav-item nav-indent-2",
+                () => {
+                  const moduleData = window.QC_LOADED_MODULES?.[item.id];
+
+                  if (!moduleData) {
+                    console.warn(`Module "${item.id}" is not loaded yet.`);
+                    return;
+                  }
+
+                  clearActiveNavigation();
+                  moduleButton.classList.add("active");
+                  window.QC.mountModule(moduleData);
+                  closeNavigation();
+                }
+              );
+
+              moduleButton.dataset.moduleId = item.id;
+              catChildren.appendChild(moduleButton);
+            });
+
+            catGroup.appendChild(catChildren);
+            categoriesChildren.appendChild(catGroup);
+          }
+
+          modulesGroup.appendChild(categoriesChildren);
+          sectionChildren.appendChild(modulesGroup);
+        }
+
+        sectionBlock.appendChild(sectionButton);
+        sectionBlock.appendChild(sectionChildren);
+        container.appendChild(sectionBlock);
+      }
+    }
+
+    async function initApp() {
+      // 1. Instantiate Core Engine Singleton
+      window.QC = new QCLabFramework("qc-framework-root");
+
+      // 2. Setup Navigation Drawer Controls
+      const menuToggle = document.getElementById("menu-toggle");
+      const navDrawer = document.getElementById("nav-drawer");
+      const navOverlay = document.getElementById("nav-overlay");
+
+      if (menuToggle) {
+        menuToggle.addEventListener("click", () => {
+          navDrawer.classList.toggle("open");
+          navOverlay.classList.toggle("active");
+        });
+      }
+
+      if (navOverlay) {
+        navOverlay.addEventListener("click", closeNavigation);
+      }
+
+      // 3. Render Navigation Tree
+      renderNavigationTree();
+
+      // 4. Asynchronously Load Module Scripts Defined in Registry
+      window.QC_LOADED_MODULES = {};
+
+      if (Array.isArray(window.QC_MODULES)) {
+        for (const item of window.QC_MODULES) {
+          if (item.file) {
+            try {
+              await loadScript(item.file);
+            } catch (err) {
+              console.error(`Error loading module ${item.id}:`, err);
+            }
+          }
+        }
+      }
+
+      // 5. Auto-Mount First Available Module
+      if (window.QC_MODULES && window.QC_MODULES.length > 0) {
+        const firstModuleId = window.QC_MODULES[0].id;
+        const firstModuleData = window.QC_LOADED_MODULES[firstModuleId];
+
+        if (firstModuleData) {
+          window.QC.mountModule(firstModuleData);
+
+          const firstNavBtn = document.querySelector(`[data-module-id="${firstModuleId}"]`);
+          if (firstNavBtn) {
+            firstNavBtn.classList.add("active");
+          }
+        }
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", initApp);
+  </script>
+</body>
+</html>
