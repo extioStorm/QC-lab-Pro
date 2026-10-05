@@ -153,6 +153,13 @@ class QCDataStore {
    * A core does not own GMM.
    * It owns a reference to the Rice/GMM test whose result applies to it.
    */
+  setCoreReference(key, value) {
+    const core = this.getCore();
+    if (!core) return;
+    core.references[key] = value || null;
+    this.save();
+  }
+
   getApplicableGmm() {
     const core = this.getCore();
     const tests = this.getRiceTests();
