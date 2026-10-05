@@ -15,10 +15,6 @@ class QCLabFramework {
     this.stepIndex = 0;
 
     // DATA ARCHITECTURE
-    // -----------------
-    // this.formData: Single Source of Truth for committed QC record values
-    // this.stagedData: Holds auto-populated prequel values or uncommitted calculations
-    // this.trainingGuesses: Temporary store for manual calculation practice inputs
     this.formData = {};
     this.stagedData = {};
     this.trainingGuesses = {};
@@ -40,12 +36,28 @@ class QCLabFramework {
 
     // Restore or initialize draft state for this module
     this.loadDraftState();
+
+    // Dynamically sync header module title if header element exists
+    const titleEl = document.getElementById("active-module-title");
+    if (titleEl) {
+      titleEl.textContent = moduleObj.title;
+    }
+
     this.render();
   }
 
   setMode(newMode) {
     if (["speed", "interactive", "training"].includes(newMode)) {
       this.mode = newMode;
+      this.stepIndex = 0; // Reset step progression when changing modes
+      this.render();
+    }
+  }
+
+  setStep(newStepIndex) {
+    if (!this.activeModule || !this.activeModule.steps) return;
+    if (newStepIndex >= 0 && newStepIndex < this.activeModule.steps.length) {
+      this.stepIndex = newStepIndex;
       this.render();
     }
   }
@@ -76,28 +88,23 @@ class QCLabFramework {
     this.formData[fieldId] = value;
     this.saveDraftState();
 
-    // In Speed Mode, immediate re-render updates live calculations continuously
+    // Continuous updates in Speed Mode
     if (this.mode === "speed") {
       this.render();
     }
   }
 
-  // INTERACTIVE MODE: Attach calculated results to ground truth upon Compute trigger
   attachCalculation() {
     if (!this.activeModule) return;
-    
-    // Mark calculations as attached and execute compute on live ground truth
     this.attachedCalculations.add("ALL_COMPUTED");
     this.saveDraftState();
     this.render();
   }
 
-  // Helper to sanitize labels into safe HTML ID attributes
   sanitizeId(str) {
     return String(str).replace(/[^a-zA-Z0-9_-]/g, "_");
   }
 
-  // TRAINING MODE: Verify hand-calculated guess against compute() ground truth
   checkTrainingGuess(fieldLabel, targetValue) {
     const safeId = this.sanitizeId(fieldLabel);
     const guessInput = document.getElementById(`guess-input-${safeId}`);
@@ -109,28 +116,28 @@ class QCLabFramework {
     const target = parseFloat(targetValue);
 
     if (isNaN(userGuess)) {
-      feedbackEl.innerHTML = `<span style="color: #f44336;">Please enter a numeric guess first.</span>`;
+      feedbackEl.innerHTML = `<span style="color: #f44336; font-size: 0.85rem;">Please enter a numeric guess.</span>`;
       return;
     }
 
     const diff = Math.abs(userGuess - target);
-    const isMatched = diff <= 0.005; // Precision tolerance
+    const isMatched = diff <= 0.005;
 
     if (isMatched) {
       feedbackEl.innerHTML = `
-        <div style="color: #4caf50; margin-top: 8px;">
+        <div style="color: #81c784; margin-top: 8px; font-size: 0.85rem;">
           ✓ Correct! Precision match within ${diff.toFixed(4)}.
-          <button type="button" class="fw-btn fw-btn-primary" style="margin-left: 8px; padding: 4px 8px;" 
+          <button type="button" class="fw-btn fw-btn-primary" style="margin-left: 8px; padding: 4px 8px; font-size: 0.75rem;" 
                   onclick="QC.commitTrainingValue('${fieldLabel}', '${targetValue}')">
-            Commit to Ground Truth
+            Commit
           </button>
         </div>
       `;
     } else {
       const direction = userGuess > target ? "high" : "low";
       feedbackEl.innerHTML = `
-        <div style="color: #ff9800; margin-top: 8px;">
-          ⚠️ Off by ${diff.toFixed(4)} (${direction}). Double-check your formula!
+        <div style="color: #ffb74d; margin-top: 8px; font-size: 0.85rem;">
+          ⚠️ Off by ${diff.toFixed(4)} (${direction}). Double-check your calculation!
         </div>
       `;
     }
@@ -156,56 +163,123 @@ class QCLabFramework {
 
     this.container.innerHTML = `
       <div class="fw-card">
-        <!-- Top Header & Mode Toolbar -->
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; margin-bottom: 16px;">
-          <div>
-            <h2 style="margin: 0;">${m.title}</h2>
-            <span style="font-size: 0.8rem; opacity: 0.7;">${m.submodule || m.parentModule || ''}</span>
+        <!-- Module Header & Mode Selector -->
+        <div class="fw-module-header">
+          <div class="fw-header-titles">
+            <h2>${m.title}</h2>
+            <span class="fw-header-sub">${m.submodule || m.parentModule || ''}</span>
           </div>
           
-          <div class="fw-mode-selector" style="display: flex; gap: 4px; background: rgba(0,0,0,0.2); padding: 4px; border-radius: 6px;">
+          <div class="fw-mode-selector">
             <button type="button" class="fw-btn ${this.mode === 'speed' ? 'fw-btn-primary' : ''}" onclick="QC.setMode('speed')">Speed</button>
             <button type="button" class="fw-btn ${this.mode === 'interactive' ? 'fw-btn-primary' : ''}" onclick="QC.setMode('interactive')">Interactive</button>
             <button type="button" class="fw-btn ${this.mode === 'training' ? 'fw-btn-primary' : ''}" onclick="QC.setMode('training')">Training</button>
           </div>
         </div>
 
-        <!-- Raw Measurement Input Fields -->
-        <h3 style="margin-top: 0;">Raw Measured Inputs</h3>
-        <div class="fw-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px;">
-          ${(m.fields || []).map(f => `
-            <div class="fw-field">
-              <label style="display: block; font-size: 0.85rem; margin-bottom: 4px;">${f.label}${f.unit ? `(${f.unit})` : ''}</label>
-              <input type="${f.type || 'text'}" 
-                     value="${this.formData[f.id] || ''}" 
-                     placeholder="${f.placeholder || ''}" 
-                     oninput="QC.updateFieldValue('${f.id}', this.value)"
-                     style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;">
-            </div>
-          `).join('')}
+        <!-- Mode-Specific Step Guidance (Interactive / Training) -->
+        ${this.renderProcedureSteps(m)}
+
+        <!-- Input Fields -->
+        <h3 class="fw-section-heading">Raw Measured Inputs</h3>
+        <div class="fw-grid">
+          ${this.renderInputFields(m)}
         </div>
 
-        <!-- Calculated Outputs Section -->
-        <h3 style="margin-top: 20px;">Calculated Results</h3>
+        <!-- Calculated Outputs -->
+        <h3 class="fw-section-heading">Calculated Results</h3>
         ${this.renderCalculatedSection(computedResults)}
+      </div>
+    `;
+  }
 
-        <!-- Module Steps Guidance -->
-        ${m.steps && m.steps.length > 0 ? `
-          <h3 style="margin-top: 24px;">Procedure Steps</h3>
-          <div class="fw-steps-list">
-            ${m.steps.map(s => `
-              <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 6px; margin-bottom: 8px; border-left: 3px solid #1976d2;">
-                <strong>Step ${s.num}: ${s.title}</strong>
-                <p style="margin: 4px 0 0 0; font-size: 0.9rem;">${s.description}</p>
-                ${this.mode === 'training' && s.learning ? `
-                  <div style="margin-top: 6px; font-size: 0.85rem; color: #90caf9;">💡 <em>${s.learning}</em></div>
-                ` : ''}
+  renderInputFields(moduleObj) {
+    const fields = moduleObj.fields || [];
+    
+    // In Interactive mode, filter inputs to the current active step (or show all if no stepNum defined)
+    const activeFields = (this.mode === "interactive" && moduleObj.steps && moduleObj.steps.length > 0)
+      ? fields.filter(f => !f.stepNum || f.stepNum === (this.stepIndex + 1))
+      : fields;
+
+    if (activeFields.length === 0) {
+      return `<p style="opacity: 0.6; font-size: 0.85rem;">No input fields required for this step.</p>`;
+    }
+
+    return activeFields.map(f => `
+      <div class="fw-input-group">
+        <label for="field-${f.id}">
+          ${f.label}${f.unit ? `<span class="fw-field-unit"> (${f.unit})</span>` : ''}
+        </label>
+        <input id="field-${f.id}"
+               type="${f.type || 'text'}" 
+               value="${this.formData[f.id] || ''}" 
+               placeholder="${f.placeholder || ''}" 
+               oninput="QC.updateFieldValue('${f.id}', this.value)">
+      </div>
+    `).join('');
+  }
+
+  renderProcedureSteps(moduleObj) {
+    if (!moduleObj.steps || moduleObj.steps.length === 0) return '';
+
+    // SPEED MODE: Compact overview of steps
+    if (this.mode === "speed") {
+      return `
+        <details class="fw-disclosure">
+          <summary>Procedure Guidance (${moduleObj.steps.length} Steps)</summary>
+          <div class="fw-disclosure-body">
+            ${moduleObj.steps.map(s => `
+              <div class="fw-step-item">
+                <strong>Step ${s.num}:${s.title}</strong>
+                <p>${s.description}</p>
               </div>
             `).join('')}
           </div>
-        ` : ''}
-      </div>
-    `;
+        </details>
+      `;
+    }
+
+    // INTERACTIVE MODE: Step-by-Step wizard progression
+    if (this.mode === "interactive") {
+      const currentStep = moduleObj.steps[this.stepIndex] || moduleObj.steps[0];
+      const isFirst = this.stepIndex === 0;
+      const isLast = this.stepIndex === moduleObj.steps.length - 1;
+
+      return `
+        <div class="fw-step-wizard">
+          <div class="fw-step-header">
+            <span class="fw-step-badge">Step ${currentStep.num} of ${moduleObj.steps.length}</span>
+            <strong class="fw-step-title">${currentStep.title}</strong>
+          </div>
+          <p class="fw-step-desc">${currentStep.description}</p>
+          ${currentStep.guidance ? `<div class="fw-step-guidance">📋 ${currentStep.guidance}</div>` : ''}
+          
+          <div class="fw-step-nav">
+            <button type="button" class="fw-btn fw-btn-secondary" ${isFirst ? 'disabled' : ''} onclick="QC.setStep(${this.stepIndex - 1})">
+              ◄ Previous
+            </button>
+            <button type="button" class="fw-btn fw-btn-primary" ${isLast ? 'disabled' : ''} onclick="QC.setStep(${this.stepIndex + 1})">
+              Next Step ►
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // TRAINING MODE: Full list with learning callouts
+    if (this.mode === "training") {
+      return `
+        <div class="fw-steps-list">
+          <h3 class="fw-section-heading">Training & Procedure Guidance</h3>
+          ${moduleObj.steps.map(s => `
+            <div class="fw-step-item fw-learning-block">
+              <strong>Step ${s.num}:${s.title}</strong>
+              <p>${s.description}</p>${s.learning ? `<div class="fw-learning-note">💡 <em>${s.learning}</em></div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
   }
 
   renderCalculatedSection(computedResults) {
@@ -213,28 +287,28 @@ class QCLabFramework {
       return `<p style="opacity: 0.6;">No calculations defined for this module.</p>`;
     }
 
-    // 1. SPEED MODE: Always Attached & Live
+    // SPEED MODE: Live attached output cards
     if (this.mode === "speed") {
       return `
-        <div class="fw-results-grid" style="display: grid; gap: 8px;">
+        <div class="fw-results-grid">
           ${computedResults.map(res => `
-            <div style="background: rgba(76, 175, 80, 0.15); border: 1px solid #4caf50; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between;">
-              <span><strong>${res.label}:</strong></span>
-              <span style="font-family: monospace; font-size: 1.1rem;">${res.value}</span>
+            <div class="fw-result-card fw-result-active">
+              <span class="fw-result-label">${res.label}</span>
+              <span class="fw-result-value">${res.value}</span>
             </div>
           `).join('')}
         </div>
       `;
     }
 
-    // 2. INTERACTIVE MODE: Detached/Blank until Compute trigger
+    // INTERACTIVE MODE: Detached state -> Compute trigger
     if (this.mode === "interactive") {
       const isAttached = this.attachedCalculations.has("ALL_COMPUTED");
 
       if (!isAttached) {
         return `
-          <div style="background: rgba(255, 255, 255, 0.05); padding: 16px; border-radius: 6px; text-align: center; border: 1px dashed rgba(255,255,255,0.2);">
-            <p style="margin-bottom: 12px; opacity: 0.8;">Calculated outputs are currently detached from ground truth.</p>
+          <div class="fw-detached-banner">
+            <p>Calculated outputs are currently detached from ground truth.</p>
             <button type="button" class="fw-btn fw-btn-primary" onclick="QC.attachCalculation()">
               ⚡ Compute & Attach Results
             </button>
@@ -243,28 +317,28 @@ class QCLabFramework {
       }
 
       return `
-        <div class="fw-results-grid" style="display: grid; gap: 8px;">
+        <div class="fw-results-grid">
           ${computedResults.map(res => `
-            <div style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255,255,255,0.2); padding: 10px; border-radius: 4px; display: flex; justify-content: space-between;">
-              <span><strong>${res.label}:</strong></span>
-              <span style="font-family: monospace; font-size: 1.1rem; color: #90caf9;">${res.value}</span>
+            <div class="fw-result-card">
+              <span class="fw-result-label">${res.label}</span>
+              <span class="fw-result-value fw-value-attached">${res.value}</span>
             </div>
           `).join('')}
         </div>
       `;
     }
 
-    // 3. TRAINING MODE: Practice Guess First -> Compare -> Attach
+    // TRAINING MODE: Hand calculation input test
     if (this.mode === "training") {
       const isAttached = this.attachedCalculations.has("ALL_COMPUTED");
 
       if (isAttached) {
         return `
-          <div class="fw-results-grid" style="display: grid; gap: 8px;">
+          <div class="fw-results-grid">
             ${computedResults.map(res => `
-              <div style="background: rgba(76, 175, 80, 0.15); border: 1px solid #4caf50; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between;">
-                <span><strong>${res.label} (Verified):</strong></span>
-                <span style="font-family: monospace; font-size: 1.1rem;">${res.value}</span>
+              <div class="fw-result-card fw-result-active">
+                <span class="fw-result-label">${res.label} (Verified)</span>
+                <span class="fw-result-value">${res.value}</span>
               </div>
             `).join('')}
           </div>
@@ -272,15 +346,15 @@ class QCLabFramework {
       }
 
       return `
-        <div style="background: rgba(21, 101, 192, 0.15); border: 1px solid #1565c0; padding: 16px; border-radius: 6px;">
-          <h4 style="margin: 0 0 12px 0; color: #90caf9;">🎓 Practice Calculation Test</h4>
+        <div class="fw-training-container">
+          <h4 class="fw-training-title">🎓 Practice Calculation Test</h4>
           ${computedResults.map(res => {
             const safeId = this.sanitizeId(res.label);
             return `
               <div style="margin-bottom: 12px;">
                 <label style="display: block; font-size: 0.85rem; margin-bottom: 4px;">Enter hand calculation for <strong>${res.label}</strong>:</label>
                 <div style="display: flex; gap: 8px;">
-                  <input type="number" step="any" id="guess-input-${safeId}" placeholder="Your calculated guess..." style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;">
+                  <input type="number" step="any" id="guess-input-${safeId}" placeholder="Your calculated guess..." style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--input-bg); color: #fff;">
                   <button type="button" class="fw-btn fw-btn-primary" onclick="QC.checkTrainingGuess('${res.label}', '${res.value}')">Check</button>
                 </div>
                 <div id="guess-feedback-${safeId}"></div>
