@@ -22,6 +22,10 @@ class QCLabFramework {
     this.stepIndex = 0;
     this.attachedCalculations = new Set();
     this.trainingGuesses = {};
+    // Keep text the user is actively typing separate from the shared record.
+    // The shared record is committed when the input loses focus, so typing
+    // never causes the framework to rebuild the page underneath the keyboard.
+    this.pendingFieldValues = {};
   }
 
   mountModule(moduleObj) {
@@ -34,6 +38,7 @@ class QCLabFramework {
     this.stepIndex = 0;
     this.attachedCalculations.clear();
     this.trainingGuesses = {};
+    this.pendingFieldValues = {};
 
     this.render();
   }
@@ -60,10 +65,27 @@ class QCLabFramework {
    */
   getFieldValue(field) {
     if (!window.QC_DATA) return "";
-    return QC_DATA.getField(field.dataTarget || "core.measurements", field.id) ?? "";
+
+    if (Object.prototype.hasOwnProperty.call(this.pendingFieldValues, field.id)) {
+      return this.pendingFieldValues[field.id];
+    }
+
+    return QC_DATA.getField(
+      field.dataTarget || "core.measurements",
+      field.dataKey || field.id
+    ) ?? "";
   }
 
   updateFieldValue(fieldId, value) {
+    const field = (this.activeModule?.fields || []).find(f => f.id === fieldId);
+    if (!field) return;
+
+    // Do NOT render here. Rendering replaces the input element and causes
+    // mobile keyboards/focus to disappear after the first typed character.
+    this.pendingFieldValues[fieldId] = value;
+  }
+
+  commitFieldValue(fieldId, value) {
     const field = (this.activeModule?.fields || []).find(f => f.id === fieldId);
     if (!field || !window.QC_DATA) return;
 
@@ -73,9 +95,16 @@ class QCLabFramework {
       value
     );
 
-    if (this.mode === "speed") {
-      this.render();
-    }
+    delete this.pendingFieldValues[fieldId];
+    this.refreshCalculatedResults();
+  }
+
+  refreshCalculatedResults() {
+    const resultsContainer = document.getElementById("fw-calculated-results");
+    if (!resultsContainer || !this.activeModule) return;
+
+    const calculatedData = this.calculateActiveModule();
+    resultsContainer.innerHTML = this.renderCalculatedSection(calculatedData);
   }
 
   /**
@@ -218,7 +247,9 @@ class QCLabFramework {
         </div>
 
         <h3 class="fw-section-heading">Calculated Results</h3>
-        ${this.renderCalculatedSection(calculatedData)}
+        <div id="fw-calculated-results">
+          ${this.renderCalculatedSection(calculatedData)}
+        </div>
       </div>
     `;
   }
@@ -239,20 +270,32 @@ class QCLabFramework {
           <strong>Session:</strong> ${session?.label || QC_DATA.context.sessionId}
         </div>
         <div class="fw-context-control">
-          <label for="qc-core-id">Core</label>
-          <input id="qc-core-id" type="text"
-                 value="${core?.id || ""}"
-                 placeholder="e.g. 457"
-                 onchange="QC.setCoreContext(this.value)">
+          <label for="qc-core-id">Current Core</label>
+          <div class="fw-context-entry">
+            <input id="qc-core-id" type="text"
+                   value="${core?.id || ""}"
+                   placeholder="e.g. 457"
+                   autocomplete="off">
+            <button type="button" class="fw-btn fw-btn-secondary"
+                    onclick="QC.setCoreContext(document.getElementById('qc-core-id').value)">
+              Open
+            </button>
+          </div>
           ${coreIds.length ? `<small>Existing: ${coreIds.join(", ")}</small>` : ""}
         </div>
         <div class="fw-context-control">
-          <label for="qc-rice-test-id">Rice/GMM test record</label>
-          <input id="qc-rice-test-id" type="text"
-                 value="${QC_DATA.context.riceTestId || ""}"
-                 placeholder="e.g. RICE-001"
-                 onchange="QC.setRiceTestContext(this.value)">
-          <small>Use this when editing a Rice/GMM test record.</small>
+          <label for="qc-rice-test-id">Current Rice/GMM Record</label>
+          <div class="fw-context-entry">
+            <input id="qc-rice-test-id" type="text"
+                   value="${QC_DATA.context.riceTestId || ""}"
+                   placeholder="e.g. RICE-001"
+                   autocomplete="off">
+            <button type="button" class="fw-btn fw-btn-secondary"
+                    onclick="QC.setRiceTestContext(document.getElementById('qc-rice-test-id').value)">
+              Open
+            </button>
+          </div>
+          <small>Choose a record here only when editing that Rice/GMM test.</small>
         </div>
         <div class="fw-context-control">
           <label for="qc-gmm-source">Applicable GMM source</label>
@@ -295,7 +338,8 @@ class QCLabFramework {
                type="${f.type || "text"}"
                value="${this.getFieldValue(f)}"
                placeholder="${f.placeholder || ""}"
-               oninput="QC.updateFieldValue('${f.id}', this.value)">
+               oninput="QC.updateFieldValue('${f.id}', this.value)"
+               onblur="QC.commitFieldValue('${f.id}', this.value)">
       </div>
     `).join("");
   }
