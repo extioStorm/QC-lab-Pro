@@ -47,15 +47,23 @@
 
   <!-- Main Application Root Container -->
   <main id="qc-framework-root" class="framework-root-container">
-    <!-- framework-engine.js mounts active modules here -->
+    <!-- The engine replaces this container with the currently selected module UI. -->
+    <!-- Think of this as the screen the JavaScript "paints" into. -->
   </main>
 
+  <!--
+    LOAD ORDER MATTERS:
+    1. framework-engine.js defines QCLabFramework.
+    2. registry.js defines which modules exist.
+    3. initApp() below creates the framework and loads the registered modules.
+  -->
   <!-- Core Scripts -->
   <script src="framework-engine.js"></script>
   <script src="modules/registry.js?v=1.0.0"></script>
 
   <!-- Application Setup & Navigation Script -->
   <script>
+    // Load one module JavaScript file and add a timestamp so the browser does not accidentally keep using an older cached copy. If the script is already on the page, do nothing because loading it twice would run its registration code twice.
     // Timestamp-based script loader.
     function loadScript(src) {
       return new Promise((resolve, reject) => {
@@ -74,16 +82,19 @@
       });
     }
 
+    // Close the slide-out navigation drawer and its dark background overlay.
     function closeNavigation() {
       document.getElementById("nav-drawer").classList.remove("open");
       document.getElementById("nav-overlay").classList.remove("active");
     }
 
+    // Remove the visual "selected" state from every navigation button.
     function clearActiveNavigation() {
       document.querySelectorAll("#navigation-tree .nav-item.active")
         .forEach(el => el.classList.remove("active"));
     }
 
+    // Create one navigation button in a consistent way so all navigation branches behave the same when clicked.
     function createNavItem(label, className, onClick) {
       const button = document.createElement("button");
       button.type = "button";
@@ -93,6 +104,7 @@
       return button;
     }
 
+    // Build the entire navigation drawer from metadata supplied by registry.js. Nothing here hard-codes the individual module list; the registry is the source of truth.
     function renderNavigationTree() {
       const container = document.getElementById("navigation-tree");
       container.innerHTML = "";
@@ -116,6 +128,7 @@
         const sectionChildren = document.createElement("div");
         sectionChildren.className = "nav-section-children";
 
+        // WORKDAY VIEW: show modules in the order a technician would normally encounter them. This is only a different view of the same registered modules.
         // 1. WORKDAY CHRONOLOGICAL PROJECTION
         if (section.childrenFrom === "QC_MODULES_WORKDAY") {
           const workdayModules = [...(window.QC_MODULES || [])]
@@ -153,6 +166,7 @@
           workdayGroup.appendChild(workdayGroupChildren);
           sectionChildren.appendChild(workdayGroup);
 
+        // TESTING VIEW: organize modules by their laboratory category instead of workday order.
         // 2. STANDARD LAB TAXONOMY PROJECTION (Testing)
         } else if (section.childrenFrom === "QC_MODULES") {
           const modules = [...(window.QC_MODULES || [])]
@@ -246,10 +260,13 @@
       }
     }
 
+    // Main startup sequence. In plain English: create engine → connect menu → build navigation → load modules → show first module.
     async function initApp() {
+      // Create the one framework controller used by the whole page. window.QC is global because generated buttons call QC.* methods.
       // 1. Instantiate Core Engine Singleton
       window.QC = new QCLabFramework("qc-framework-root");
 
+      // Connect the hamburger button and overlay to the drawer open/close behavior.
       // 2. Setup Navigation Drawer Controls
       const menuToggle = document.getElementById("menu-toggle");
       const navDrawer = document.getElementById("nav-drawer");
@@ -266,9 +283,11 @@
         navOverlay.addEventListener("click", closeNavigation);
       }
 
+      // Turn registry metadata into visible navigation buttons.
       // 3. Render Navigation Tree
       renderNavigationTree();
 
+      // Load every registered module script. Each module registers itself in QC_LOADED_MODULES when its file executes, so the engine can find it later.
       // 4. Asynchronously Load Module Scripts Defined in Registry
       window.QC_LOADED_MODULES = {};
 
@@ -284,6 +303,7 @@
         }
       }
 
+      // Pick the first registered module and display it immediately so the app is not blank.
       // 5. Auto-Mount First Available Module
       if (window.QC_MODULES && window.QC_MODULES.length > 0) {
         const firstModuleId = window.QC_MODULES[0].id;
