@@ -1,14 +1,14 @@
 /**
  * AASHTO T 166: Bulk Specific Gravity (Gmb) of Compacted Asphalt
- * Includes explicit intermediate volume (B - C) and optional spec check toggle.
+ * Module Data Schema & Execution Math (v1.0.2)
  */
 window.gmbCoreDensityModule = {
   id: "gmb_core_density",
   title: "AASHTO T 166 (Core Gmb)",
-  parentModule: "Lab Volumetrics",
-  shiftOrder: 3,
-  locationGroup: "Lab Volumetrics",
-
+  parentModule: "Volumetric Properties",
+  submodule: "AASHTO T 166 (Core Bulk Specific Gravity)",
+  
+  // Input Definitions
   fields: [
     {
       id: "mass_dry",
@@ -19,111 +19,87 @@ window.gmbCoreDensityModule = {
       stepNum: 1
     },
     {
+      id: "mass_submerged",
+      label: "Submerged Mass in Water (C)",
+      unit: "g",
+      type: "number",
+      placeholder: "e.g. 732.1",
+      stepNum: 2
+    },
+    {
       id: "mass_ssd",
       label: "Saturated Surface-Dry Mass (B)",
       unit: "g",
       type: "number",
-      placeholder: "e.g. 1254.1",
-      stepNum: 2
-    },
-    {
-      id: "mass_water",
-      label: "Submerged Mass in Water (C)",
-      unit: "g",
-      type: "number",
-      placeholder: "e.g. 732.6",
+      placeholder: "e.g. 1253.8",
       stepNum: 3
-    },
-    {
-      id: "enable_absorption_check",
-      label: "Verify Water Absorption Limit (Optional Spec Check)",
-      type: "text",
-      placeholder: "Type 'yes' or leave blank",
-      stepNum: 4
     }
   ],
 
+  // Step Definitions aligned with framework-engine.js
   steps: [
     {
       num: 1,
-      title: "Record Oven-Dry Mass (A)",
-      description: "Weigh cooled core after drying to constant mass.",
-      guidance: "Record dry mass A to the nearest 0.1g.",
-      learning: "Dry weight establishes the core asphalt-and-aggregate baseline."
+      title: "Dry Weight (A)",
+      description: "Weigh the dry core in air before water immersion.",
+      guidance: "Record dry core mass (A) to 0.1g after drying to constant mass at room temperature.",
+      learning: "Core must be dry to constant mass (less than 0.05% weight change over 2 hours) to ensure moisture does not artificially inflate initial mass."
     },
     {
       num: 2,
-      title: "Record SSD Mass (B)",
-      description: "Immerse in 77°F water bath for 4±1 min, damp-dry with towel, and weigh.",
-      guidance: "Towel-dampen quickly to remove surface water without pulling water from internal voids.",
-      learning: "SSD mass includes water filling surface-connected voids."
+      title: "Submerged Weight (C)",
+      description: "Submerge sample in water bath maintained at 77°F ± 1°F.",
+      guidance: "Immerse sample in 77°F ± 1°F water bath for 4 ± 1 minutes, tare scale suspension rig, and record mass (C).",
+      learning: "Water bath temperature controls binder viscosity and water density during volume displacement measurement."
     },
     {
       num: 3,
-      title: "Record Submerged Mass (C)",
-      description: "Weigh core suspended in 77°F water bath.",
-      guidance: "Ensure core is fully submerged and suspended clear of the bucket walls.",
-      learning: "Submerged mass establishes buoyant lift."
-    },
-    {
-      num: 4,
-      title: "Calculate Bulk Volume & Gmb",
-      description: "Subtract C from B to find bulk volume D, then divide A by D.",
-      guidance: "Bulk Volume (D) = B - C. Bulk Density Gmb = A / D.",
-      learning: "Exposing (B - C) clearly isolates specimen bulk volume prior to density determination."
+      title: "SSD Weight (B)",
+      description: "Blot surface water with a damp towel and weigh immediately.",
+      guidance: "Damp-dry surface water quickly with a damp towel (do not wipe water out of void spaces) and record SSD mass (B) within 15 seconds.",
+      learning: "Surface water must be blotted off without pulling absorbed water out of internal core voids."
     }
   ],
 
+  // Calculation Engine returning direct array for renderResultsBar()
   compute: function(data) {
     const A = parseFloat(data.mass_dry);
+    const C = parseFloat(data.mass_submerged);
     const B = parseFloat(data.mass_ssd);
-    const C = parseFloat(data.mass_water);
-    const showCheck = data.enable_absorption_check && data.enable_absorption_check.trim().toLowerCase() === "yes";
 
-    if (isNaN(A) || isNaN(B) || isNaN(C)) {
-      const results = [
-        { label: "Displaced Volume (B - C)", value: "Pending Inputs" },
-        { label: "Bulk Specific Gravity (Gmb)", value: "Pending Inputs" }
-      ];
-      if (showCheck) {
-        results.push({ label: "Water Absorption Spec Check", value: "Pending Inputs" });
-      }
-      return results;
-    }
-
-    // Intermediate Calculation (D = B - C)
-    const D = B - C;
-
-    if (D <= 0) {
+    if (isNaN(A) || isNaN(B) || isNaN(C) || A <= 0 || B <= 0 || C < 0) {
       return [
-        { label: "Error", value: "Invalid Inputs: SSD Mass (B) must be greater than Submerged Mass (C)" }
+        { label: "Bulk Volume (cm³)", value: "—" },
+        { label: "Water Absorption (%)", value: "—" },
+        { label: "Bulk Specific Gravity (Gmb)", value: "—" }
       ];
     }
 
-    const gmb = A / D;
-    const outputs = [
+    if (B < A || B <= C) {
+      return [
+        { label: "Bulk Volume (cm³)", value: "Invalid SSD/Submerged Mass" },
+        { label: "Water Absorption (%)", value: "Invalid SSD/Submerged Mass" },
+        { label: "Bulk Specific Gravity (Gmb)", value: "Invalid SSD/Submerged Mass" }
+      ];
+    }
+
+    const volume = B - C;
+    const gmb = A / volume;
+    const waterAbsorptionPct = ((B - A) / volume) * 100;
+
+    return [
       {
-        label: "Displaced Volume (B - C)",
-        value: `${D.toFixed(1)} cm³`
+        label: "Bulk Volume (cm³)",
+        value: volume.toFixed(1)
+      },
+      {
+        label: "Water Absorption (%)",
+        value: waterAbsorptionPct.toFixed(2) + (waterAbsorptionPct > 2.0 ? " (>2.0% - Consider T 275)" : "")
       },
       {
         label: "Bulk Specific Gravity (Gmb)",
-        value: `${gmb.toFixed(3)}`
+        value: gmb.toFixed(3)
       }
     ];
-
-    // Only run and show spec verification if explicitly toggled on
-    if (showCheck) {
-      const waterAbsorbed = B - A;
-      const absPercent = (waterAbsorbed / D) * 100;
-      const pass = absPercent <= 2.0;
-      
-      outputs.push({
-        label: "Water Absorption Spec Check",
-        value: `${absPercent.toFixed(2)}% — ${pass ? "PASS (Valid T 166)" : "FAIL (>2.0% - Requires AASHTO T 275 Paraffin)"}`
-      });
-    }
-
-    return outputs;
   }
 };
