@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script>
+  <script>eruda.init();</script>
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -119,16 +119,21 @@
   <script src="modules/registry.js"></script>
 
   <script>
-    // Explicit Promise-based script loader
+    // Timestamp-based script loader (Option A)
     function loadScript(src) {
       return new Promise((resolve, reject) => {
-        if (document.querySelector(`script[src="${src}"]`)) {
+        // Clean base path and inject cache-busting timestamp
+        const cleanSrc = src.split('?')[0];
+        const cacheBustedSrc = `${cleanSrc}?v=${Date.now()}`;
+
+        if (document.querySelector(`script[src^="${cleanSrc}"]`)) {
           return resolve();
         }
+
         const script = document.createElement("script");
-        script.src = src;
+        script.src = cacheBustedSrc;
         script.onload = () => resolve();
-        script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+        script.onerror = () => reject(new Error(`Failed to load script: ${cacheBustedSrc}`));
         document.body.appendChild(script);
       });
     }
