@@ -51,12 +51,35 @@ class QCLabFramework {
     }
   }
 
+  isStepComplete(step) {
+    if (!step) return false;
+
+    // Measurement steps are complete when their required field contains
+    // a usable numeric value. Calculation steps are complete once the
+    // procedure itself has produced a valid calculation.
+    if (step.fieldId) {
+      const field = (this.activeModule?.fields || []).find(f => f.id === step.fieldId);
+      if (!field) return false;
+      const value = this.getFieldValue(field);
+      return value !== "" && Number.isFinite(parseFloat(value));
+    }
+
+    const calculated = this.calculateActiveModule();
+    return calculated?.isComplete !== false;
+  }
+
   setStep(newStepIndex) {
     if (!this.activeModule?.steps) return;
-    if (newStepIndex >= 0 && newStepIndex < this.activeModule.steps.length) {
-      this.stepIndex = newStepIndex;
-      this.render();
+    if (newStepIndex < 0 || newStepIndex >= this.activeModule.steps.length) return;
+
+    // Do not let the user skip a required measurement/calculation step.
+    if (newStepIndex > this.stepIndex) {
+      const currentStep = this.activeModule.steps[this.stepIndex];
+      if (!this.isStepComplete(currentStep)) return;
     }
+
+    this.stepIndex = newStepIndex;
+    this.render();
   }
 
   /**
@@ -248,7 +271,7 @@ class QCLabFramework {
 
         <h3 class="fw-section-heading">Calculated Results</h3>
         <div id="fw-calculated-results">
-          ${this.renderCalculatedSection(calculatedData)}
+          ${this.renderCalculatedSection(calculatedData, m)}
         </div>
       </div>
     `;
@@ -332,7 +355,7 @@ class QCLabFramework {
     return activeFields.map(f => `
       <div class="fw-input-group">
         <label for="field-${f.id}">
-          ${f.label}${f.unit ? `<span class="fw-field-unit"> (${f.unit})</span>` : ""}
+          ${this.mode === "interactive" && f.interactiveLabel ? f.interactiveLabel : f.label}${f.unit ? `<span class="fw-field-unit"> (${f.unit})</span>` : ""}
         </label>
         <input id="field-${f.id}"
                type="${f.type || "text"}"
@@ -367,6 +390,7 @@ class QCLabFramework {
       const currentStep = moduleObj.steps[this.stepIndex] || moduleObj.steps[0];
       const isFirst = this.stepIndex === 0;
       const isLast = this.stepIndex === moduleObj.steps.length - 1;
+      const canAdvance = this.isStepComplete(currentStep);
 
       return `
         <div class="fw-step-wizard">
@@ -378,7 +402,11 @@ class QCLabFramework {
           ${currentStep.guidance ? `<div class="fw-step-guidance">📋 ${currentStep.guidance}</div>` : ""}
           <div class="fw-step-nav">
             <button type="button" class="fw-btn fw-btn-secondary" ${isFirst ? "disabled" : ""} onclick="QC.setStep(${this.stepIndex - 1})">◄ Previous</button>
-            <button type="button" class="fw-btn fw-btn-primary" ${isLast ? "disabled" : ""} onclick="QC.setStep(${this.stepIndex + 1})">Next Step ►</button>
+            <button type="button" class="fw-btn fw-btn-primary"
+                    ${isLast || !canAdvance ? "disabled" : ""}
+                    onclick="QC.setStep(${this.stepIndex + 1})">
+              ${isLast ? "Step Complete" : "Next Step ►"}
+            </button>
           </div>
         </div>
       `;
@@ -402,7 +430,7 @@ class QCLabFramework {
     return "";
   }
 
-  renderCalculatedSection(calculatedData) {
+  renderCalculatedSection(calculatedData, moduleObj = this.activeModule) {
     const results = Array.isArray(calculatedData)
       ? calculatedData
       : (calculatedData?.results || []);
@@ -436,45 +464,57 @@ class QCLabFramework {
     }
 
     if (this.mode === "interactive") {
-      if (!isComplete) {
+      // Show exactly one calculation at a time. The procedure has already
+      // propagated the values through QC_DATA; this UI exposes that chain.
+      if (this.stepIndex < 3) {
         return `
           <div class="fw-detached-banner">
-            <p style="margin:0;">Fill in the required measurements above to reveal the explicit calculation steps.</p>
+            <p style="margin:0;">Complete the measurement above, then continue to review the calculation.</p>
           </div>
         `;
       }
 
-      const isAttached = this.attachedCalculations.has("ALL_COMPUTED");
+      if (!isComplete) {
+        return `
+          <div class="fw-detached-banner">
+            <p style="margin:0;">Complete all three measurements before reviewing the calculation steps.</p>
+          </div>
+        `;
+      }
+
+      const currentMath = stepMath.find(step => step.workflowStep === this.stepIndex + 1);
+
+      if (!currentMath) {
+        return `
+          <div class="fw-detached-banner">
+            <p style="margin:0;">This step does not have a calculation to display yet.</p>
+          </div>
+        `;
+      }
+
+      const isLastCalculation = this.stepIndex === moduleObj.steps.length - 1;
 
       return `
         <div class="fw-whiteboard-container">
-          <h4>🧮 Explicit Calculation Steps</h4>
-          ${stepMath.map(step => `
-            <div class="fw-math-step">
-              <strong>${step.stepName}</strong>
-              <div class="fw-math-formula">${step.formula}</div>
-              <div>${step.calculation} = <strong>${step.result}</strong></div>
-            </div>
-          `).join("")}
+          <h4>🧮 ${currentMath.stepName}</h4>
+          <div class="fw-math-formula">${currentMath.formula}</div>
+          <div class="fw-math-calculation">${currentMath.calculation}</div>
+          <div class="fw-math-result">Result: <strong>${currentMath.result}</strong></div>
+          ${currentMath.explanation ? `<p class="fw-step-desc">${currentMath.explanation}</p>` : ""}
 
-          <div class="fw-attach-row">
-            ${isAttached
-              ? `<span class="fw-success">✓ Results attached to the shared project record.</span>`
-              : `<button type="button" class="fw-btn fw-btn-primary" onclick="QC.attachCalculation()">⚡ Attach Results</button>`}
-          </div>
-        </div>
-
-        <div class="fw-results-grid">
-          ${results.map(res => `
-            <div class="fw-result-card ${isAttached ? "fw-result-active" : ""}">
-              <span class="fw-result-label">${res.label}</span>
-              <span class="fw-result-value">${isAttached ? res.value : "Pending Attach"}</span>
+          ${isLastCalculation ? `
+            <div class="fw-results-grid">
+              ${results.map(res => `
+                <div class="fw-result-card fw-result-active">
+                  <span class="fw-result-label">${res.label}</span>
+                  <span class="fw-result-value">${res.value}</span>
+                </div>
+              `).join("")}
             </div>
-          `).join("")}
+          ` : ""}
         </div>
       `;
     }
-
     if (this.mode === "training") {
       const isAttached = this.attachedCalculations.has("ALL_COMPUTED");
 
