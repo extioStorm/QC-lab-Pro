@@ -2,6 +2,8 @@
  * AASHTO T 166: Bulk Specific Gravity (Gmb) of Compacted Asphalt
  * Module Data Schema & Execution Math (v1.0.4)
  */
+// This object is the actual AASHTO T 166 procedure. The framework supplies form data,
+// while this module defines the fields, procedure steps, validation rules, and laboratory math.
 window.gmbCoreDensityModule = {
   id: "gmb_core_density",
   title: "AASHTO T 166 (Core Gmb)",
@@ -18,6 +20,8 @@ window.gmbCoreDensityModule = {
     supports: ["density_reporting", "compaction_comparison"]
   },
 
+  // These are the raw measurements the technician enters. The stepNum values tell the framework
+  // which Interactive-mode step should display each measurement.
   fields: [
     {
       id: "mass_dry",
@@ -45,6 +49,8 @@ window.gmbCoreDensityModule = {
     }
   ],
 
+  // These entries are instructions, not calculations. The framework uses them to build the
+  // Speed/Interactive/Training guidance screens.
   steps: [
     {
       num: 1,
@@ -79,11 +85,17 @@ window.gmbCoreDensityModule = {
     }
   ],
 
+  // This is the module's calculation engine.
+  // Input: the framework's formData object. Output: validation status, displayed results,
+  // and the explicit arithmetic used by Interactive mode.
   compute: function(data) {
+    // A = dry mass, B = saturated surface-dry mass, C = submerged mass.
+    // parseFloat converts the text from HTML <input> elements into numbers for arithmetic.
     const A = parseFloat(data.mass_dry);
     const C = parseFloat(data.mass_submerged);
     const B = parseFloat(data.mass_ssd);
 
+    // First gate: make sure all three measurements exist and are physically reasonable numbers.
     if (isNaN(A) || isNaN(B) || isNaN(C) || A <= 0 || B <= 0 || C < 0) {
       return {
         isComplete: false,
@@ -96,6 +108,8 @@ window.gmbCoreDensityModule = {
       };
     }
 
+    // Second gate: reject an impossible mass relationship before doing the math.
+    // The intended sequence is B >= A and B > C.
     if (B < A || B <= C) {
       return {
         isComplete: false,
@@ -109,8 +123,11 @@ window.gmbCoreDensityModule = {
       };
     }
 
+    // Once the inputs pass validation, calculate displaced bulk volume first.
     const volume = B - C;
+    // Gmb is dry mass divided by the measured bulk volume.
     const gmb = A / volume;
+    // Water absorption is the increase from dry mass to SSD mass, expressed as a percent of volume.
     const waterAbsorptionPct = ((B - A) / volume) * 100;
 
     return {
@@ -120,6 +137,7 @@ window.gmbCoreDensityModule = {
         { label: "Water Absorption (%)", value: waterAbsorptionPct.toFixed(2) + (waterAbsorptionPct > 2.0 ? " (>2.0% - Consider T 275)" : "") },
         { label: "Bulk Specific Gravity (Gmb)", value: gmb.toFixed(3) }
       ],
+      // Give the framework the same math as readable text so the user can audit each arithmetic step.
       // Explicit breakdown for Interactive whiteboard rendering
       stepMath: [
         {
