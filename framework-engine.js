@@ -165,6 +165,14 @@ class QCLabFramework {
     this.render();
   }
 
+  setRiceTestContext(testId) {
+    if (!testId) return;
+    QC_DATA.setContext({ riceTestId: String(testId) });
+    QC_DATA.ensureRiceTest(String(testId));
+    QC_DATA.save();
+    this.render();
+  }
+
   setGmmSource(testId) {
     if (!QC_DATA.getCore()) return;
     QC_DATA.setCoreReference("gmmTestId", testId);
@@ -237,6 +245,14 @@ class QCLabFramework {
                  placeholder="e.g. 457"
                  onchange="QC.setCoreContext(this.value)">
           ${coreIds.length ? `<small>Existing: ${coreIds.join(", ")}</small>` : ""}
+        </div>
+        <div class="fw-context-control">
+          <label for="qc-rice-test-id">Rice/GMM test record</label>
+          <input id="qc-rice-test-id" type="text"
+                 value="${QC_DATA.context.riceTestId || ""}"
+                 placeholder="e.g. RICE-001"
+                 onchange="QC.setRiceTestContext(this.value)">
+          <small>Use this when editing a Rice/GMM test record.</small>
         </div>
         <div class="fw-context-control">
           <label for="qc-gmm-source">Applicable GMM source</label>
