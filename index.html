@@ -6,7 +6,7 @@
   <title>QC Lab Framework Engine</title>
   <link rel="stylesheet" href="framework-style.css">
   <style>
-    /* Top Header Bar */
+    /* Top Navigation Header */
     .nav-header-bar {
       display: flex;
       align-items: center;
@@ -92,34 +92,33 @@
 </head>
 <body>
 
-  <!-- Top Navigation Header -->
+  <!-- Top Header Navigation -->
   <div class="nav-header-bar">
     <button id="menu-toggle" class="nav-toggle-btn">&#9776; Menu</button>
     <span style="font-weight: bold; font-size: 0.95rem;">QC Materials Testing</span>
     <span style="width: 24px;"></span>
   </div>
 
-  <!-- Slide-out Drawer Navigation -->
+  <!-- Slide-out Sidebar Drawer -->
   <div id="nav-drawer" class="nav-drawer">
     <h3 class="drawer-title">Test Modules</h3>
     <ul id="module-list-container" class="module-list"></ul>
   </div>
 
-  <!-- Background Dim Overlay -->
+  <!-- Dimmed Background Overlay -->
   <div id="nav-overlay" class="nav-overlay"></div>
 
-  <!-- Master Core Mount -->
+  <!-- Master Framework Core Mount -->
   <div id="qc-framework-root"></div>
 
-  <!-- Framework Engine & Module Registry -->
+  <!-- Framework Engine & Registry -->
   <script src="framework-engine.js"></script>
   <script src="modules/registry.js"></script>
 
   <script>
-    // --- Dynamic Script Loader Helper ---
+    // Explicit Promise-based script loader
     function loadScript(src) {
       return new Promise((resolve, reject) => {
-        // Prevent duplicate script tags
         if (document.querySelector(`script[src="${src}"]`)) {
           return resolve();
         }
@@ -132,7 +131,7 @@
     }
 
     document.addEventListener("DOMContentLoaded", async () => {
-      // 1. Initialize Core Engine
+      // 1. Initialize Engine
       window.QC = new QCLabFramework("qc-framework-root");
 
       // 2. Navigation Drawer Toggle Controls
@@ -150,7 +149,7 @@
         overlay.classList.remove("active");
       });
 
-      // 3. Process Installed Modules from registry.js
+      // 3. Process Installed Modules
       const listContainer = document.getElementById("module-list-container");
 
       if (!window.QC_MODULES || window.QC_MODULES.length === 0) {
@@ -162,10 +161,7 @@
         const item = window.QC_MODULES[i];
 
         try {
-          // Dynamically load the module file defined in registry.js
           await loadScript(item.script);
-
-          // Get instantiated module object from global scope
           const moduleData = window[item.objectName];
 
           if (moduleData) {
@@ -182,16 +178,16 @@
 
             listContainer.appendChild(li);
 
-            // Automatically mount the first module
+            // Mount initial module
             if (i === 0) {
               li.classList.add("active");
               window.QC.mountModule(moduleData);
             }
           } else {
-            console.error(`Module object "${item.objectName}" not found on window after loading ${item.script}`);
+            console.error(`Object window["${item.objectName}"] not found after loading ${item.script}`);
           }
         } catch (err) {
-          console.error(err);
+          console.error(`Error loading module ${item.id}:`, err);
         }
       }
     });
