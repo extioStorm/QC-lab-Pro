@@ -1,6 +1,7 @@
 /* QC Lab Framework - Master Engine Styles (v1.0.2) */
 /* AI CONTEXT: See modules/registry.js for the active application dependency map and cross-file contracts before modifying this file. */
 
+/* GLOBAL DESIGN TOKENS: these variables let the rest of the stylesheet share the same colors. */
 :root {
   --bg-dark: #121212;
   --card-bg: #1e1e1e;
@@ -13,6 +14,7 @@
   --input-bg: #2a2a2a;
 }
 
+/* Base page: dark background, light text, and small screen-friendly padding. */
 body {
   background-color: var(--bg-dark);
   color: var(--text-main);
@@ -21,6 +23,7 @@ body {
   padding: 12px;
 }
 
+/* Main content width. The engine renders the module UI inside this element. */
 /* Master Shell Container */
 #qc-framework-root {
   max-width: 800px;
@@ -28,6 +31,7 @@ body {
   box-sizing: border-box;
 }
 
+/* Header at the very top of the application. */
 /* Top Action Bar Header */
 .app-header {
   display: flex;
@@ -60,6 +64,7 @@ body {
   flex-shrink: 0;
 }
 
+/* Navigation drawer: hidden off-screen until JavaScript adds the .open class. */
 /* Slide-out Sidebar Drawer */
 .nav-drawer {
   position: fixed;
@@ -77,7 +82,7 @@ body {
   overflow-y: auto;
 }
 
-.nav-drawer.open { left: 0; }
+.nav-drawer.open { left: 0; } /* JavaScript adds "open" when the menu is opened. */
 
 .nav-overlay {
   position: fixed;
@@ -88,7 +93,7 @@ body {
   z-index: 999;
 }
 
-.nav-overlay.active { display: block; }
+.nav-overlay.active { display: block; } /* JavaScript adds "active" while the drawer is open. */
 
 .drawer-title {
   font-size: 1.1rem;
@@ -99,6 +104,7 @@ body {
   padding-bottom: 8px;
 }
 
+/* MODULE CONTENT STYLES: these classes are emitted by framework-engine.js. */
 /* Module Header Layout Fix */
 .fw-module-header {
   display: flex;
@@ -128,6 +134,7 @@ body {
   opacity: 0.7;
 }
 
+/* Three mode buttons: Speed, Interactive, and Training. */
 /* Mode Switcher Bar */
 .fw-mode-selector {
   display: flex;
@@ -138,6 +145,7 @@ body {
   align-self: flex-start;
 }
 
+/* Outer card that contains one rendered module. */
 /* Framework Cards */
 .fw-card {
   background-color: var(--card-bg);
@@ -157,6 +165,7 @@ body {
   padding-bottom: 4px;
 }
 
+/* The engine turns module.fields into this responsive input grid. */
 /* Standardized Form Input Grid */
 .fw-grid {
   display: grid;
@@ -198,6 +207,7 @@ body {
   border-color: var(--accent-blue);
 }
 
+/* Interactive mode: one procedure step at a time. */
 /* Step Wizard (Interactive Mode) */
 .fw-step-wizard {
   background: rgba(255, 255, 255, 0.03);
@@ -250,6 +260,7 @@ body {
   gap: 8px;
 }
 
+/* Speed mode: procedure guidance is collapsed into a compact disclosure. */
 /* Disclosure Blocks (Speed Mode) */
 .fw-disclosure {
   background: rgba(0, 0, 0, 0.2);
@@ -281,6 +292,7 @@ body {
   color: var(--text-muted);
 }
 
+/* Training mode: show the extra learning explanation attached to each procedure step. */
 /* Learning Callouts (Training Mode) */
 .fw-learning-block {
   padding: 10px;
@@ -295,6 +307,7 @@ body {
   color: #90caf9;
 }
 
+/* Result cards are generated from whatever each module returns from compute(). */
 /* Calculated Results Grid */
 .fw-results-grid {
   display: grid;
@@ -368,6 +381,7 @@ body {
   font-size: 0.95rem;
 }
 
+/* Shared buttons used by the framework for mode switching, navigation, and commits. */
 /* Action Buttons */
 .fw-btn {
   padding: 8px 14px;
