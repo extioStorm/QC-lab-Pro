@@ -1,9 +1,18 @@
 /**
  * AASHTO T 166: Bulk Specific Gravity (Gmb) of Compacted Asphalt
- * Module Data Schema & Execution Math (v1.0.4)
+ *
+ * This module describes the procedure.
+ *
+ * IMPORTANT ARCHITECTURE:
+ *   - Measurements live in QC_DATA under the current Core.
+ *   - Calculated/intermediate values are written back to that same Core.
+ *   - GMM does not belong to the Core. The Core references the Rice/GMM
+ *     test that applies to it.
+ *
+ * The module is therefore a procedure acting on shared records, not a
+ * container holding its own private formData.
  */
-// This object is the actual AASHTO T 166 procedure. The framework supplies form data,
-// while this module defines the fields, procedure steps, validation rules, and laboratory math.
+
 window.gmbCoreDensityModule = {
   id: "gmb_core_density",
   title: "AASHTO T 166 (Core Gmb)",
@@ -20,11 +29,10 @@ window.gmbCoreDensityModule = {
     supports: ["density_reporting", "compaction_comparison"]
   },
 
-  // These are the raw measurements the technician enters. The stepNum values tell the framework
-  // which Interactive-mode step should display each measurement.
   fields: [
     {
       id: "mass_dry",
+      dataTarget: "core.measurements",
       label: "Dry Mass in Air (A)",
       unit: "g",
       type: "number",
@@ -33,6 +41,7 @@ window.gmbCoreDensityModule = {
     },
     {
       id: "mass_submerged",
+      dataTarget: "core.measurements",
       label: "Submerged Mass in Water (C)",
       unit: "g",
       type: "number",
@@ -41,6 +50,7 @@ window.gmbCoreDensityModule = {
     },
     {
       id: "mass_ssd",
+      dataTarget: "core.measurements",
       label: "Saturated Surface-Dry Mass (B)",
       unit: "g",
       type: "number",
@@ -49,105 +59,131 @@ window.gmbCoreDensityModule = {
     }
   ],
 
-  // These entries are instructions, not calculations. The framework uses them to build the
-  // Speed/Interactive/Training guidance screens.
   steps: [
     {
       num: 1,
       title: "Dry Weight (A)",
       description: "Weigh the dry core in air before water immersion.",
       guidance: "Record dry core mass (A) to 0.1g after drying to constant mass at room temperature.",
-      learning: "Core must be dry to constant mass (<0.05% weight change over 2 hrs) to ensure moisture doesn't inflate initial mass.",
+      learning: "Core must be dry to constant mass so moisture does not inflate the initial mass.",
       fieldId: "mass_dry"
     },
     {
       num: 2,
       title: "Submerged Weight (C)",
-      description: "Submerge sample in water bath maintained at 77°F ± 1°F.",
-      guidance: "Immerse sample in 77°F ± 1°F water bath for 4 ± 1 minutes, tare scale suspension rig, and record mass (C).",
-      learning: "Water bath temperature controls binder viscosity and water density during volume displacement measurement.",
+      description: "Submerge sample in the controlled water bath and record its submerged mass.",
+      guidance: "Immerse the sample and record mass (C) according to the applicable procedure.",
+      learning: "Water displacement provides the basis for the measured bulk volume.",
       fieldId: "mass_submerged"
     },
     {
       num: 3,
       title: "SSD Weight (B)",
-      description: "Blot surface water with a damp towel and weigh immediately.",
-      guidance: "Damp-dry surface water quickly with a damp towel and record SSD mass (B) within 15 seconds.",
-      learning: "Surface water must be blotted off without pulling absorbed water out of internal core voids.",
+      description: "Blot surface water and weigh the specimen immediately.",
+      guidance: "Record SSD mass (B) promptly after surface drying.",
+      learning: "Surface water is removed without removing absorbed water from the specimen voids.",
       fieldId: "mass_ssd"
     },
     {
       num: 4,
-      title: "Volumetric Breakdown & Gmb Computation",
-      description: "Calculate volume displacement (B - C) and specific gravity (A / Volume).",
-      guidance: "Review the step-by-step arithmetic below to verify raw weights before committing to ground truth.",
-      learning: "Bulk volume is measured by water displacement: Volume = SSD Mass (B) - Submerged Mass (C)."
+      title: "Volumetric Breakdown & Gmb",
+      description: "Use the stored measurements to create explicit intermediate values and the final Gmb.",
+      guidance: "Review the arithmetic before attaching the calculated values to the official record.",
+      learning: "The intermediate values remain part of the Core record and can be reused by later tests."
     }
   ],
 
-  // This is the module's calculation engine.
-  // Input: the framework's formData object. Output: validation status, displayed results,
-  // and the explicit arithmetic used by Interactive mode.
-  compute: function(data) {
-    // A = dry mass, B = saturated surface-dry mass, C = submerged mass.
-    // parseFloat converts the text from HTML <input> elements into numbers for arithmetic.
-    const A = parseFloat(data.mass_dry);
-    const C = parseFloat(data.mass_submerged);
-    const B = parseFloat(data.mass_ssd);
+  /**
+   * Perform the procedure's explicit calculation.
+   *
+   * This does NOT return a temporary spreadsheet.
+   * It reads the current Core's measurements and writes the named
+   * intermediate/final values back into the Core's calculations/results.
+   */
+  calculate: function(store) {
+    const core = store.getCore();
 
-    // First gate: make sure all three measurements exist and are physically reasonable numbers.
+    if (!core) {
+      return {
+        isComplete: false,
+        results: []
+      };
+    }
+
+    const A = parseFloat(core.measurements.mass_dry);
+    const C = parseFloat(core.measurements.mass_submerged);
+    const B = parseFloat(core.measurements.mass_ssd);
+
     if (isNaN(A) || isNaN(B) || isNaN(C) || A <= 0 || B <= 0 || C < 0) {
       return {
         isComplete: false,
         results: [
           { label: "Bulk Volume (cm³)", value: "—" },
           { label: "Water Absorption (%)", value: "—" },
-          { label: "Bulk Specific Gravity (Gmb)", value: "—" }
-        ],
-        stepMath: []
+          { label: "Bulk Specific Gravity (Gmb)", value: "—" },
+          { label: "Percent of GMM", value: "—" }
+        ]
       };
     }
 
-    // Second gate: reject an impossible mass relationship before doing the math.
-    // The intended sequence is B >= A and B > C.
     if (B < A || B <= C) {
       return {
         isComplete: false,
-        error: "Invalid SSD/Submerged mass sequence (B must be ≥ A and > C).",
-        results: [
-          { label: "Bulk Volume (cm³)", value: "Invalid Inputs" },
-          { label: "Water Absorption (%)", value: "Invalid Inputs" },
-          { label: "Bulk Specific Gravity (Gmb)", value: "Invalid Inputs" }
-        ],
-        stepMath: []
+        error: "Invalid mass relationship: SSD mass (B) must be ≥ dry mass (A) and > submerged mass (C).",
+        results: []
       };
     }
 
-    // Once the inputs pass validation, calculate displaced bulk volume first.
+    // Explicit intermediate variables become persistent Core data.
     const volume = B - C;
-    // Gmb is dry mass divided by the measured bulk volume.
-    const gmb = A / volume;
-    // Water absorption is the increase from dry mass to SSD mass, expressed as a percent of volume.
     const waterAbsorptionPct = ((B - A) / volume) * 100;
+    const gmb = A / volume;
+
+    core.calculations.bulkVolume = volume;
+    core.calculations.waterAbsorptionPct = waterAbsorptionPct;
+    core.calculations.gmb = gmb;
+
+    const applicableGmm = store.getApplicableGmm();
+    let percentGmm = null;
+
+    if (applicableGmm && parseFloat(applicableGmm.value) > 0) {
+      percentGmm = (gmb / parseFloat(applicableGmm.value)) * 100;
+      core.calculations.percentGmm = percentGmm;
+    } else {
+      delete core.calculations.percentGmm;
+    }
+
+    // Results are the values the procedure makes available to the rest of the application.
+    core.results.gmb = gmb;
+    core.results.percentGmm = percentGmm;
+
+    store.save();
 
     return {
       isComplete: true,
       results: [
         { label: "Bulk Volume (cm³)", value: volume.toFixed(1) },
-        { label: "Water Absorption (%)", value: waterAbsorptionPct.toFixed(2) + (waterAbsorptionPct > 2.0 ? " (>2.0% - Consider T 275)" : "") },
-        { label: "Bulk Specific Gravity (Gmb)", value: gmb.toFixed(3) }
+        {
+          label: "Water Absorption (%)",
+          value: waterAbsorptionPct.toFixed(2) +
+            (waterAbsorptionPct > 2.0 ? " (>2.0% - Consider T 275)" : "")
+        },
+        { label: "Bulk Specific Gravity (Gmb)", value: gmb.toFixed(3) },
+        {
+          label: "Percent of GMM",
+          value: percentGmm === null ? "No GMM linked" : percentGmm.toFixed(2) + "%",
+          numericValue: percentGmm
+        }
       ],
-      // Give the framework the same math as readable text so the user can audit each arithmetic step.
-      // Explicit breakdown for Interactive whiteboard rendering
       stepMath: [
         {
-          stepName: "1. Calculate Bulk Volume (cm³)",
+          stepName: "1. Calculate Bulk Volume",
           formula: "Volume = SSD Mass (B) - Submerged Mass (C)",
           calculation: `${B.toFixed(1)} g - ${C.toFixed(1)} g`,
           result: `${volume.toFixed(1)} cm³`
         },
         {
-          stepName: "2. Calculate Water Absorption (%)",
+          stepName: "2. Calculate Water Absorption",
           formula: "Abs % = [(SSD Mass (B) - Dry Mass (A)) / Volume] × 100",
           calculation: `[(${B.toFixed(1)} - ${A.toFixed(1)}) / ${volume.toFixed(1)}] × 100`,
           result: `${waterAbsorptionPct.toFixed(2)}%`
@@ -157,6 +193,14 @@ window.gmbCoreDensityModule = {
           formula: "Gmb = Dry Mass (A) / Bulk Volume",
           calculation: `${A.toFixed(1)} g / ${volume.toFixed(1)} cm³`,
           result: gmb.toFixed(3)
+        },
+        {
+          stepName: "4. Compare Gmb to the Applicable GMM",
+          formula: "%GMM = Gmb / GMM × 100",
+          calculation: applicableGmm
+            ? `${gmb.toFixed(3)} / ${parseFloat(applicableGmm.value).toFixed(3)} × 100`
+            : "No applicable GMM test has been linked to this Core",
+          result: percentGmm === null ? "Pending GMM" : percentGmm.toFixed(2) + "%"
         }
       ]
     };
