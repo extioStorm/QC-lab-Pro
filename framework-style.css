@@ -495,3 +495,19 @@ body {
   margin-top: 8px;
   font-size: 0.85rem;
 }
+
+
+.fw-context-entry {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.fw-context-entry input {
+  flex: 1;
+  min-width: 0;
+}
+
+.fw-context-entry .fw-btn {
+  flex-shrink: 0;
+}
