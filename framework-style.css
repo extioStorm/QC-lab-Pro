@@ -1,4 +1,6 @@
-/* QC Lab Framework - Master Engine Styles (v1.0.0) */
+/* QC Lab Framework - Master Engine Styles (v1.0.1) */
+/* AI CONTEXT: See modules/registry.js for the active application dependency map and cross-file contracts before modifying this file. */
+
 :root {
   --bg-dark: #121212;
   --card-bg: #1e1e1e;
@@ -23,6 +25,171 @@ body {
 #qc-framework-root {
   max-width: 800px;
   margin: 0 auto;
+}
+
+/* Top Navigation Header */
+.nav-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #1e1e1e;
+  border-bottom: 1px solid #333;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+}
+
+.nav-toggle-btn {
+  background: none;
+  border: 1px solid #444;
+  color: #e0e0e0;
+  font-size: 1.2rem;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* Slide-out Sidebar Drawer */
+.nav-drawer {
+  position: fixed;
+  top: 0;
+  left: -280px;
+  width: 260px;
+  height: 100%;
+  background-color: #181818;
+  border-right: 1px solid #333;
+  box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+  transition: left 0.3s ease;
+  z-index: 1000;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.nav-drawer.open {
+  left: 0;
+}
+
+/* Dimmed Background Overlay */
+.nav-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: none;
+  z-index: 999;
+}
+
+.nav-overlay.active {
+  display: block;
+}
+
+.drawer-title {
+  font-size: 1.1rem;
+  color: #81c784;
+  margin-top: 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #333;
+  padding-bottom: 8px;
+}
+
+/* Metadata-driven Navigation Tree */
+.navigation-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-section,
+.nav-group {
+  display: block;
+}
+
+.nav-section-title,
+.nav-group-title,
+.nav-item {
+  width: 100%;
+  box-sizing: border-box;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.nav-section-title {
+  padding: 10px 8px;
+  color: #e0e0e0;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.nav-group-title {
+  padding: 8px;
+  font-weight: 600;
+}
+
+.nav-item {
+  padding: 8px;
+  margin-bottom: 2px;
+}
+
+.nav-section-title:hover,
+.nav-group-title:hover,
+.nav-item:hover {
+  background-color: #2a2a2a;
+  color: #fff;
+}
+
+.nav-item.active {
+  background-color: var(--accent-green);
+  color: #fff;
+}
+
+.nav-section-title::before,
+.nav-group-title::before {
+  content: "▾";
+  display: inline-block;
+  width: 18px;
+  color: #81c784;
+}
+
+.nav-section:not(.expanded) > .nav-section-children,
+.nav-group:not(.expanded) > .nav-group-children {
+  display: none;
+}
+
+.nav-section:not(.expanded) > .nav-section-title::before,
+.nav-group:not(.expanded) > .nav-group-title::before {
+  content: "▸";
+}
+
+.nav-section-children,
+.nav-group-children {
+  margin-left: 8px;
+}
+
+.nav-indent-1 {
+  padding-left: 16px;
+}
+
+.nav-indent-2 {
+  padding-left: 24px;
+}
+
+.nav-indent-3 {
+  padding-left: 32px;
+}
+
+.nav-placeholder {
+  padding: 8px 16px;
+  color: #666;
+  font-size: 0.8rem;
+  font-style: italic;
 }
 
 /* Depth Mode Control Bar */
