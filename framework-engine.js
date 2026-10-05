@@ -92,10 +92,16 @@ class QCLabFramework {
     this.render();
   }
 
+  // Helper to sanitize labels into safe HTML ID attributes
+  sanitizeId(str) {
+    return String(str).replace(/[^a-zA-Z0-9_-]/g, "_");
+  }
+
   // TRAINING MODE: Verify hand-calculated guess against compute() ground truth
   checkTrainingGuess(fieldLabel, targetValue) {
-    const guessInput = document.getElementById(`guess-input-${fieldLabel}`);
-    const feedbackEl = document.getElementById(`guess-feedback-${fieldLabel}`);
+    const safeId = this.sanitizeId(fieldLabel);
+    const guessInput = document.getElementById(`guess-input-${safeId}`);
+    const feedbackEl = document.getElementById(`guess-feedback-${safeId}`);
     
     if (!guessInput || !feedbackEl) return;
 
@@ -268,16 +274,19 @@ class QCLabFramework {
       return `
         <div style="background: rgba(21, 101, 192, 0.15); border: 1px solid #1565c0; padding: 16px; border-radius: 6px;">
           <h4 style="margin: 0 0 12px 0; color: #90caf9;">🎓 Practice Calculation Test</h4>
-          ${computedResults.map(res => `
-            <div style="margin-bottom: 12px;">
-              <label style="display: block; font-size: 0.85rem; margin-bottom: 4px;">Enter hand calculation for <strong>${res.label}</strong>:</label>
-              <div style="display: flex; gap: 8px;">
-                <input type="number" step="any" id="guess-input-${res.label}" placeholder="Your calculated guess..." style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;">
-                <button type="button" class="fw-btn fw-btn-primary" onclick="QC.checkTrainingGuess('${res.label}', '${res.value}')">Check</button>
+          ${computedResults.map(res => {
+            const safeId = this.sanitizeId(res.label);
+            return `
+              <div style="margin-bottom: 12px;">
+                <label style="display: block; font-size: 0.85rem; margin-bottom: 4px;">Enter hand calculation for <strong>${res.label}</strong>:</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="number" step="any" id="guess-input-${safeId}" placeholder="Your calculated guess..." style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;">
+                  <button type="button" class="fw-btn fw-btn-primary" onclick="QC.checkTrainingGuess('${res.label}', '${res.value}')">Check</button>
+                </div>
+                <div id="guess-feedback-${safeId}"></div>
               </div>
-              <div id="guess-feedback-${res.label}"></div>
-            </div>
-          `).join('')}
+            `;
+          }).join('')}
         </div>
       `;
     }
