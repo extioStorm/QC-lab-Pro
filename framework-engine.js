@@ -159,7 +159,7 @@ class QCLabFramework {
     }
 
     const m = this.activeModule;
-    const computedResults = m.compute ? m.compute(this.formData) : [];
+    const computedData = m.compute ? m.compute(this.formData) : [];
 
     this.container.innerHTML = `
       <div class="fw-card">
@@ -188,7 +188,7 @@ class QCLabFramework {
 
         <!-- Calculated Outputs -->
         <h3 class="fw-section-heading">Calculated Results</h3>
-        ${this.renderCalculatedSection(computedResults)}
+        ${this.renderCalculatedSection(computedData)}
       </div>
     `;
   }
@@ -196,7 +196,7 @@ class QCLabFramework {
   renderInputFields(moduleObj) {
     const fields = moduleObj.fields || [];
     
-    // In Interactive mode, filter inputs to the current active step (or show all if no stepNum defined)
+    // In Interactive mode, filter inputs to current step if specified, or render all
     const activeFields = (this.mode === "interactive" && moduleObj.steps && moduleObj.steps.length > 0)
       ? fields.filter(f => !f.stepNum || f.stepNum === (this.stepIndex + 1))
       : fields;
@@ -282,16 +282,20 @@ class QCLabFramework {
     }
   }
 
-  renderCalculatedSection(computedResults) {
-    if (!computedResults || computedResults.length === 0) {
+  renderCalculatedSection(computedData) {
+    const results = Array.isArray(computedData) ? computedData : (computedData.results || []);
+    const stepMath = computedData.stepMath || [];
+    const isComplete = computedData.isComplete;
+
+    if (!results || results.length === 0) {
       return `<p style="opacity: 0.6;">No calculations defined for this module.</p>`;
     }
 
-    // SPEED MODE: Live attached output cards
+    // SPEED MODE: Live output cards
     if (this.mode === "speed") {
       return `
         <div class="fw-results-grid">
-          ${computedResults.map(res => `
+          ${results.map(res => `
             <div class="fw-result-card fw-result-active">
               <span class="fw-result-label">${res.label}</span>
               <span class="fw-result-value">${res.value}</span>
@@ -301,41 +305,66 @@ class QCLabFramework {
       `;
     }
 
-    // INTERACTIVE MODE: Detached state -> Compute trigger
+    // INTERACTIVE MODE: Exposed Whiteboard Hand Math
     if (this.mode === "interactive") {
       const isAttached = this.attachedCalculations.has("ALL_COMPUTED");
 
-      if (!isAttached) {
+      if (!isComplete) {
         return `
           <div class="fw-detached-banner">
-            <p>Calculated outputs are currently detached from ground truth.</p>
-            <button type="button" class="fw-btn fw-btn-primary" onclick="QC.attachCalculation()">
-              ⚡ Compute & Attach Results
-            </button>
+            <p style="margin: 0;">Fill in all required weights above to reveal step-by-step calculations.</p>
           </div>
         `;
       }
 
       return `
+        <div class="fw-whiteboard-container" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+          <h4 style="margin: 0 0 12px 0; color: #81c784; font-size: 0.95rem;">🧮 Interactive Step-by-Step Hand Math</h4>
+          
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            ${stepMath.map(m => `
+              <div style="background: rgba(255,255,255,0.04); border-left: 3px solid #81c784; padding: 10px 12px; border-radius: 4px;">
+                <div style="font-weight: 600; font-size: 0.85rem; color: #e0e0e0; margin-bottom: 4px;">${m.stepName}</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); font-family: monospace;">Formula: ${m.formula}</div>
+                <div style="font-size: 0.9rem; margin-top: 4px; font-family: monospace; color: #fff;">
+                  ${m.calculation} = <strong style="color: #81c784; font-size: 1rem;">${m.result}</strong>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div style="margin-top: 16px; text-align: right;">
+            ${!isAttached ? `
+              <button type="button" class="fw-btn fw-btn-primary" onclick="QC.attachCalculation()">
+                ⚡ Compute & Attach Results
+              </button>
+            ` : `
+              <span style="color: #81c784; font-weight: 600; font-size: 0.88rem;">
+                ✓ Results Attached to Official Record
+              </span>
+            `}
+          </div>
+        </div>
+
         <div class="fw-results-grid">
-          ${computedResults.map(res => `
-            <div class="fw-result-card">
+          ${results.map(res => `
+            <div class="fw-result-card ${isAttached ? 'fw-result-active' : ''}">
               <span class="fw-result-label">${res.label}</span>
-              <span class="fw-result-value fw-value-attached">${res.value}</span>
+              <span class="fw-result-value ${isAttached ? '' : 'fw-value-attached'}">${isAttached ? res.value : 'Pending Commit'}</span>
             </div>
           `).join('')}
         </div>
       `;
     }
 
-    // TRAINING MODE: Hand calculation input test
+    // TRAINING MODE: Practice guess validation
     if (this.mode === "training") {
       const isAttached = this.attachedCalculations.has("ALL_COMPUTED");
 
       if (isAttached) {
         return `
           <div class="fw-results-grid">
-            ${computedResults.map(res => `
+            ${results.map(res => `
               <div class="fw-result-card fw-result-active">
                 <span class="fw-result-label">${res.label} (Verified)</span>
                 <span class="fw-result-value">${res.value}</span>
@@ -348,7 +377,7 @@ class QCLabFramework {
       return `
         <div class="fw-training-container">
           <h4 class="fw-training-title">🎓 Practice Calculation Test</h4>
-          ${computedResults.map(res => {
+          ${results.map(res => {
             const safeId = this.sanitizeId(res.label);
             return `
               <div style="margin-bottom: 12px;">
