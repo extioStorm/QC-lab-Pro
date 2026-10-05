@@ -140,3 +140,7 @@ window.gmbCoreDensityModule = {
     ];
   }
 };
+
+// Register module into global framework lookup table
+window.QC_LOADED_MODULES = window.QC_LOADED_MODULES || {};
+window.QC_LOADED_MODULES["gmb_core_density"] = window.gmbCoreDensityModule;
