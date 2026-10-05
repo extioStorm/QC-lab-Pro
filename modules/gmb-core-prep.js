@@ -1,32 +1,27 @@
 /**
  * Field Core Extraction & Prep
- * Prequel Module for AASHTO T 166 (Core Gmb)
  *
- * AI CONTEXT: See modules/registry.js for application architecture
- * and cross-file contracts.
+ * This procedure works on the same Core record used by laboratory modules.
+ * It does not create a private formData object.
  */
-// This module represents the field-side work that happens before the laboratory T 166 test.
-// It stores the location/thickness measurements and exposes a simple readiness result.
+
 window.gmbCorePrepModule = {
   id: "gmb_core_prep",
   title: "Field Core Drilling & Prep",
   parentModule: "Field Sampling",
   submodule: "Core Drilling & Thickness",
 
-  // Workflow relationships & exported data keys
   workflow: {
     prequels: [],
     sequels: ["gmb_core_density"],
     chronologicalOrder: 10
   },
 
-  // Metadata describing exported values available to downstream modules
   dataExports: [
     { key: "core_thickness", label: "Core Thickness (in)" },
     { key: "station_location", label: "Station Location" }
   ],
 
-  // Module Navigation & Reference Tags
   metadata: {
     type: "prep",
     category: ["field", "sampling"],
@@ -35,11 +30,10 @@ window.gmbCorePrepModule = {
     workflowRoles: ["field_tech"]
   },
 
-  // Raw Input Measurements
-  // Raw field measurements entered by the technician.
   fields: [
     {
       id: "station_location",
+      dataTarget: "core.measurements",
       label: "Station / Location",
       unit: "",
       type: "text",
@@ -48,6 +42,7 @@ window.gmbCorePrepModule = {
     },
     {
       id: "core_thickness",
+      dataTarget: "core.measurements",
       label: "Average Core Thickness",
       unit: "in",
       type: "number",
@@ -56,34 +51,43 @@ window.gmbCorePrepModule = {
     }
   ],
 
-  // Step-by-step procedural breakdown
-  // Procedure guidance for the field technician. These steps do not perform calculations.
   steps: [
     {
       num: 1,
       title: "Field Marking & Drilling",
-      description: "Mark randomly selected core location and extract core using 4-inch diamond bit.",
-      guidance: "Ensure drill rig is level and perpendicular to pavement surface during cutting.",
-      learning: "Perpendicular core barrels ensure uniform specimen volume during density testing."
+      description: "Mark the randomly selected core location and extract the core.",
+      guidance: "Record the station/location as part of the Core record.",
+      learning: "The Core record follows the specimen through later laboratory procedures."
     },
     {
       num: 2,
       title: "Trimming & Thickness Check",
-      description: "Trim tack coat / subbase layer and record average thickness across 4 points.",
-      guidance: "Use masonry saw to trim bottom unbonded material before laboratory testing.",
-      learning: "Removing non-specimen surface layers is mandatory to avoid skewing volume calculations."
+      description: "Trim non-specimen material and record the average core thickness.",
+      guidance: "Complete the field measurements before sending the Core into laboratory testing.",
+      learning: "These measurements remain available to downstream modules because they belong to the Core."
     }
   ],
 
-  // Compute Engine
-  // Decide whether the core has enough information to be considered ready for the laboratory step.
-  compute: function(data) {
-    // Location is informational; thickness is the measurement that determines readiness.
-    const loc = data.station_location || "—";
-    const thick = parseFloat(data.core_thickness);
+  /**
+   * This procedure does not need a calculation engine.
+   * It simply reports the state of the shared Core record.
+   */
+  calculate: function(store) {
+    const core = store.getCore();
 
-    // A positive numeric thickness means the minimum required prep measurement is present.
+    if (!core) {
+      return {
+        isComplete: false,
+        results: []
+      };
+    }
+
+    const loc = core.measurements.station_location || "—";
+    const thick = parseFloat(core.measurements.core_thickness);
     const isReady = !isNaN(thick) && thick > 0;
+
+    core.results.corePrepReady = isReady;
+    store.save();
 
     return [
       {
@@ -92,12 +96,13 @@ window.gmbCorePrepModule = {
       },
       {
         label: "Core Readiness Status",
-        value: isReady ? "Ready for T 166 Laboratory Testing" : "Incomplete Thickness Measurement"
+        value: isReady
+          ? "Ready for T 166 Laboratory Testing"
+          : "Incomplete Thickness Measurement"
       }
     ];
   }
 };
 
-// Register module into global framework lookup table
 window.QC_LOADED_MODULES = window.QC_LOADED_MODULES || {};
 window.QC_LOADED_MODULES["gmb_core_prep"] = window.gmbCorePrepModule;
