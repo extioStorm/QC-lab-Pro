@@ -1,204 +1,93 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-  <script>eruda.init();</script>
+<!-- Replace your drawer content inside <div id="nav-drawer" class="nav-drawer"> -->
+<h3 class="drawer-title">Test Modules</h3>
 
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QC Lab Framework Engine</title>
-  <link rel="stylesheet" href="framework-style.css">
-  <style>
-    /* Top Navigation Header */
-    .nav-header-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background-color: #1e1e1e;
-      border-bottom: 1px solid #333;
-      padding: 10px 16px;
-      margin-bottom: 16px;
+<!-- View Mode Switcher -->
+<div class="drawer-toggle-container" style="display: flex; gap: 4px; margin-bottom: 12px; background: #111; padding: 4px; border-radius: 4px;">
+  <button id="view-chronological" class="view-btn active" style="flex: 1; padding: 6px; font-size: 0.75rem; border: none; border-radius: 3px; cursor: pointer; background: #2e7d32; color: #fff;">Shift Order</button>
+  <button id="view-domain" class="view-btn" style="flex: 1; padding: 6px; font-size: 0.75rem; border: none; border-radius: 3px; cursor: pointer; background: transparent; color: #aaa;">By Location</button>
+</div>
+
+<ul id="module-list-container" class="module-list"></ul>
+
+<script>
+  let currentViewMode = "chronological"; // "chronological" | "domain"
+
+  function renderModuleList() {
+    const listContainer = document.getElementById("module-list-container");
+    listContainer.innerHTML = "";
+
+    if (!window.QC_MODULES || window.QC_MODULES.length === 0) {
+      listContainer.innerHTML = "<li style='color:#ef5350;'>No modules registered</li>";
+      return;
     }
 
-    .nav-toggle-btn {
-      background: none;
-      border: 1px solid #444;
-      color: #e0e0e0;
-      font-size: 1.2rem;
-      padding: 4px 10px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    /* Slide-out Sidebar Drawer */
-    .nav-drawer {
-      position: fixed;
-      top: 0;
-      left: -280px;
-      width: 260px;
-      height: 100%;
-      background-color: #181818;
-      border-right: 1px solid #333;
-      box-shadow: 2px 0 10px rgba(0,0,0,0.5);
-      transition: left 0.3s ease;
-      z-index: 1000;
-      padding: 16px;
-      box-sizing: border-box;
-      overflow-y: auto;
-    }
-
-    .nav-drawer.open { left: 0; }
-
-    /* Dimmed Background Overlay */
-    .nav-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.5);
-      display: none;
-      z-index: 999;
-    }
-
-    .nav-overlay.active { display: block; }
-
-    .drawer-title {
-      font-size: 1.1rem;
-      color: #81c784;
-      margin-top: 0;
-      margin-bottom: 16px;
-      border-bottom: 1px solid #333;
-      padding-bottom: 8px;
-    }
-
-    .module-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-
-    .module-list li {
-      padding: 10px;
-      border-radius: 4px;
-      color: #a0a0a0;
-      cursor: pointer;
-      font-size: 0.9rem;
-      margin-bottom: 4px;
-    }
-
-    .module-list li:hover, .module-list li.active {
-      background-color: #2e7d32;
-      color: #fff;
-    }
-  </style>
-</head>
-<body>
-
-  <!-- Top Header Navigation -->
-  <div class="nav-header-bar">
-    <button id="menu-toggle" class="nav-toggle-btn">&#9776; Menu</button>
-    <span style="font-weight: bold; font-size: 0.95rem;">QC Materials Testing</span>
-    <span style="width: 24px;"></span>
-  </div>
-
-  <!-- Slide-out Sidebar Drawer -->
-  <div id="nav-drawer" class="nav-drawer">
-    <h3 class="drawer-title">Test Modules</h3>
-    <ul id="module-list-container" class="module-list"></ul>
-  </div>
-
-  <!-- Dimmed Background Overlay -->
-  <div id="nav-overlay" class="nav-overlay"></div>
-
-  <!-- Master Framework Core Mount -->
-  <div id="qc-framework-root"></div>
-
-  <!-- Framework Engine & Registry -->
-  <script src="framework-engine.js"></script>
-  <script src="modules/registry.js"></script>
-
-  <script>
-    // Timestamp-based script loader (Option A)
-    function loadScript(src) {
-      return new Promise((resolve, reject) => {
-        // Clean base path and inject cache-busting timestamp
-        const cleanSrc = src.split('?')[0];
-        const cacheBustedSrc = `${cleanSrc}?v=${Date.now()}`;
-
-        if (document.querySelector(`script[src^="${cleanSrc}"]`)) {
-          return resolve();
+    if (currentViewMode === "chronological") {
+      const sorted = [...window.QC_MODULES].sort((a, b) => a.shiftOrder - b.shiftOrder);
+      sorted.forEach((item, index) => {
+        const li = createModuleListItem(item);
+        listContainer.appendChild(li);
+        if (index === 0 && !window.QC.currentModule) {
+          li.click();
         }
+      });
+    } else {
+      const groups = {};
+      window.QC_MODULES.forEach(item => {
+        const groupName = item.locationGroup || "General";
+        if (!groups[groupName]) groups[groupName] = [];
+        groups[groupName].push(item);
+      });
 
-        const script = document.createElement("script");
-        script.src = cacheBustedSrc;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error(`Failed to load script: ${cacheBustedSrc}`));
-        document.body.appendChild(script);
+      Object.keys(groups).forEach(groupName => {
+        const groupHeader = document.createElement("div");
+        groupHeader.textContent = groupName;
+        groupHeader.style.cssText = "font-size: 0.75rem; color: #81c784; text-transform: uppercase; margin: 12px 0 4px 4px; font-weight: bold;";
+        listContainer.appendChild(groupHeader);
+
+        groups[groupName].forEach(item => {
+          const li = createModuleListItem(item);
+          listContainer.appendChild(li);
+        });
       });
     }
+  }
 
-    document.addEventListener("DOMContentLoaded", async () => {
-      // 1. Initialize Engine
-      window.QC = new QCLabFramework("qc-framework-root");
+  function createModuleListItem(item) {
+    const li = document.createElement("li");
+    li.textContent = item.title;
 
-      // 2. Navigation Drawer Toggle Controls
-      const drawer = document.getElementById("nav-drawer");
-      const overlay = document.getElementById("nav-overlay");
-      const toggleBtn = document.getElementById("menu-toggle");
+    li.onclick = async () => {
+      document.querySelectorAll("#module-list-container li").forEach(el => el.classList.remove("active"));
+      li.classList.add("active");
 
-      toggleBtn.addEventListener("click", () => {
-        drawer.classList.add("open");
-        overlay.classList.add("active");
-      });
-
-      overlay.addEventListener("click", () => {
-        drawer.classList.remove("open");
-        overlay.classList.remove("active");
-      });
-
-      // 3. Process Installed Modules
-      const listContainer = document.getElementById("module-list-container");
-
-      if (!window.QC_MODULES || window.QC_MODULES.length === 0) {
-        listContainer.innerHTML = "<li style='color:#ef5350;'>No modules registered</li>";
-        return;
-      }
-
-      for (let i = 0; i < window.QC_MODULES.length; i++) {
-        const item = window.QC_MODULES[i];
-
-        try {
-          await loadScript(item.script);
-          const moduleData = window[item.objectName];
-
-          if (moduleData) {
-            const li = document.createElement("li");
-            li.textContent = item.title || moduleData.title;
-
-            li.onclick = () => {
-              document.querySelectorAll("#module-list-container li").forEach(el => el.classList.remove("active"));
-              li.classList.add("active");
-              window.QC.mountModule(moduleData);
-              drawer.classList.remove("open");
-              overlay.classList.remove("active");
-            };
-
-            listContainer.appendChild(li);
-
-            // Mount initial module
-            if (i === 0) {
-              li.classList.add("active");
-              window.QC.mountModule(moduleData);
-            }
-          } else {
-            console.error(`Object window["${item.objectName}"] not found after loading ${item.script}`);
-          }
-        } catch (err) {
-          console.error(`Error loading module ${item.id}:`, err);
+      try {
+        await loadScript(item.script);
+        const moduleData = window[item.objectName];
+        if (moduleData) {
+          window.QC.mountModule(moduleData);
+          document.getElementById("nav-drawer").classList.remove("open");
+          document.getElementById("nav-overlay").classList.remove("active");
         }
+      } catch (err) {
+        console.error(`Error loading module ${item.id}:`, err);
       }
-    });
-  </script>
-</body>
-</html>
+    };
+
+    return li;
+  }
+
+  // Toggle button event listeners
+  document.getElementById("view-chronological").addEventListener("click", (e) => {
+    currentViewMode = "chronological";
+    e.target.style.background = "#2e7d32"; e.target.style.color = "#fff";
+    document.getElementById("view-domain").style.background = "transparent"; document.getElementById("view-domain").style.color = "#aaa";
+    renderModuleList();
+  });
+
+  document.getElementById("view-domain").addEventListener("click", (e) => {
+    currentViewMode = "domain";
+    e.target.style.background = "#2e7d32"; e.target.style.color = "#fff";
+    document.getElementById("view-chronological").style.background = "transparent"; document.getElementById("view-chronological").style.color = "#aaa";
+    renderModuleList();
+  });
+</script>
