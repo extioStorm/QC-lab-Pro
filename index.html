@@ -3,75 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#1f2937">
-  <title>Lab Procedure Engine</title>
-  <link rel="stylesheet" href="style.css">
+  <title>QC Lab Framework</title>
+  <link rel="stylesheet" href="framework-style.css">
 </head>
 <body>
-  <div class="app">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark">L</div>
-        <div>
-          <strong>Lab Framework</strong>
-          <small>PWA Knowledge Engine</small>
-        </div>
-      </div>
 
-      <nav class="tree">
-        <button class="tree-item active">Dashboard</button>
+  <!-- The single mount point for the framework engine -->
+  <div id="qc-framework-root"></div>
 
-        <button class="tree-item expandable" data-target="testing">
-          <span>▾</span> Asphalt Testing
-        </button>
-        <div id="testing" class="tree-children">
-          <button class="tree-item selected">Core Density (Gmb)</button>
-          <button class="tree-item">Rice Test (Gmm)</button>
-        </div>
-
-        <button class="tree-item expandable" data-target="modules">
-          <span>▾</span> Lab Routines
-        </button>
-        <div id="modules" class="tree-children">
-          <button class="tree-item">Opening Checklist</button>
-          <button class="tree-item">Equipment Calibration</button>
-        </div>
-
-        <button class="tree-item">Lab Ledger / Book</button>
-        <button class="tree-item">Settings</button>
-      </nav>
-
-      <div class="sidebar-footer">
-        <small>Framework v0.3</small>
-      </div>
-    </aside>
-
-    <main class="workspace">
-      <header class="topbar">
-        <div>
-          <span class="eyebrow">AASHTO T 166 / ASTM D2726</span>
-          <h1 id="procedure-title">Bulk Specific Gravity & Density of Compacted Cores</h1>
-        </div>
-        <button class="menu-button" aria-label="Toggle navigation">☰</button>
-      </header>
-
-      <section class="module-shell">
-        <!-- Disclosure / Mode Toolbar -->
-        <div class="mode-bar">
-          <span class="mode-label">Detail Depth:</span>
-          <div class="mode-toggle">
-            <button class="depth-btn" data-depth="speed">Speed Mode</button>
-            <button class="depth-btn active" data-depth="custom">Interactive</button>
-            <button class="depth-btn" data-depth="learning">Expand All (Learning)</button>
-          </div>
-        </div>
-
-        <!-- Single Workspace Output Canvas -->
-        <div id="procedural-workspace"></div>
-      </section>
-    </main>
-  </div>
+  <!-- Framework Engine Script -->
+  <script src="framework-engine.js"></script>
   
-  <script src="app.js?v=0.5.0"></script>
+  <!-- Module Data Scripts -->
+  <script src="modules/gmb-core-density.js"></script>
+
+  <!-- Mount Engine -->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // Instantiate Framework
+      window.QC = new QCLabFramework("qc-framework-root");
+      
+      // Mount Core Density Module
+      window.QC.mountModule(gmbCoreDensityModule);
+    });
+  </script>
 </body>
 </html>
