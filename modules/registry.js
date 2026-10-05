@@ -85,7 +85,7 @@
  * Each registry entry provides:
  *   - id         : stable module identifier
  *   - title      : display name
- *   - script     : module script loaded by index.html
+ *   - file       : module script loaded by index.html
  *   - objectName : global module object expected after the script loads
  *   - navigation : metadata used to place the module in navigation
  *
@@ -117,7 +117,7 @@ window.QC_MODULES = [
   {
     id: "gmb_core_prep",
     title: "Field Core Drilling & Prep",
-    script: "modules/gmb-core-prep.js?v=1.0.0",
+    file: "modules/gmb-core-prep.js?v=1.0.1",
     objectName: "gmbCorePrepModule",
 
     // Standard Lab Hierarchy Navigation
@@ -140,7 +140,7 @@ window.QC_MODULES = [
   {
     id: "gmb_core_density",
     title: "AASHTO T 166 (Core Gmb)",
-    script: "modules/gmb-core-density.js?v=1.0.3",
+    file: "modules/gmb-core-density.js?v=1.0.3",
     objectName: "gmbCoreDensityModule",
 
     // Standard Lab Hierarchy Navigation
