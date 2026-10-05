@@ -34,6 +34,7 @@ window.gmbCoreDensityModule = {
       id: "mass_dry",
       dataTarget: "core.measurements",
       label: "Dry Mass in Air (A)",
+      interactiveLabel: "Dry Weight in Air (A)",
       unit: "g",
       type: "number",
       placeholder: "e.g. 1250.4",
@@ -43,6 +44,7 @@ window.gmbCoreDensityModule = {
       id: "mass_submerged",
       dataTarget: "core.measurements",
       label: "Submerged Mass in Water (C)",
+      interactiveLabel: "Submerged Weight in Water (C)",
       unit: "g",
       type: "number",
       placeholder: "e.g. 732.1",
@@ -51,7 +53,8 @@ window.gmbCoreDensityModule = {
     {
       id: "mass_ssd",
       dataTarget: "core.measurements",
-      label: "Saturated Surface-Dry Mass (B)",
+      label: "SSD Mass (B)",
+      interactiveLabel: "Saturated Surface-Dry Weight (B)",
       unit: "g",
       type: "number",
       placeholder: "e.g. 1253.8",
@@ -62,37 +65,57 @@ window.gmbCoreDensityModule = {
   steps: [
     {
       num: 1,
-      title: "Dry Weight (A)",
-      description: "Weigh the dry core in air before water immersion.",
-      guidance: "Record dry core mass (A) to 0.1g after drying to constant mass at room temperature.",
-      learning: "Core must be dry to constant mass so moisture does not inflate the initial mass.",
+      title: "Enter the Dry Weight (A)",
+      description: "Enter the weight of the completely dry core while it is weighed in air.",
+      guidance: "This is the first measured value used by the calculation.",
+      learning: "The dry weight is the starting mass for calculating the core’s bulk specific gravity.",
       fieldId: "mass_dry"
     },
     {
       num: 2,
-      title: "Submerged Weight (C)",
-      description: "Submerge sample in the controlled water bath and record its submerged mass.",
-      guidance: "Immerse the sample and record mass (C) according to the applicable procedure.",
-      learning: "Water displacement provides the basis for the measured bulk volume.",
+      title: "Enter the Submerged Weight (C)",
+      description: "Enter the weight of the core while it is submerged in water.",
+      guidance: "This is the second measured value used to determine the core’s bulk volume.",
+      learning: "The submerged measurement tells us how much water the specimen displaces.",
       fieldId: "mass_submerged"
     },
     {
       num: 3,
-      title: "SSD Weight (B)",
-      description: "Blot surface water and weigh the specimen immediately.",
-      guidance: "Record SSD mass (B) promptly after surface drying.",
-      learning: "Surface water is removed without removing absorbed water from the specimen voids.",
+      title: "Enter the Saturated Surface-Dry Weight (B)",
+      description: "Remove surface water without removing water held inside the specimen, then enter that weight.",
+      guidance: "Interactive mode spells out the term so the operator does not have to know the abbreviation SSD.",
+      learning: "This measurement is the surface-dry mass used with the submerged mass to determine bulk volume.",
       fieldId: "mass_ssd"
     },
     {
       num: 4,
-      title: "Volumetric Breakdown & Gmb",
-      description: "Use the stored measurements to create explicit intermediate values and the final Gmb.",
-      guidance: "Review the arithmetic before attaching the calculated values to the official record.",
-      learning: "The intermediate values remain part of the Core record and can be reused by later tests."
+      title: "Calculate the Bulk Volume",
+      description: "Subtract the submerged weight from the saturated surface-dry weight.",
+      guidance: "Watch the two entered measurements propagate directly into the subtraction.",
+      learning: "The difference gives the measured bulk volume of the core."
+    },
+    {
+      num: 5,
+      title: "Calculate Bulk Specific Gravity (Gmb)",
+      description: "Divide the dry weight by the bulk volume we just calculated.",
+      guidance: "The bulk-volume result from the previous step is carried directly into this calculation.",
+      learning: "This produces the core’s bulk specific gravity, commonly called Gmb."
+    },
+    {
+      num: 6,
+      title: "Calculate Water Absorption",
+      description: "Use the saturated surface-dry weight, dry weight, and the same calculated bulk volume to determine water absorption.",
+      guidance: "The previously calculated bulk volume is reused here rather than recalculated separately.",
+      learning: "This is a separate reported property and does not replace the Gmb calculation."
+    },
+    {
+      num: 7,
+      title: "Compare Gmb to the Applicable GMM",
+      description: "If an applicable Rice/GMM result is linked, divide Gmb by GMM and multiply by 100.",
+      guidance: "The Gmb produced in Step 5 is the value propagated into this final comparison.",
+      learning: "This produces the core’s percent of maximum theoretical specific gravity."
     }
   ],
-
   /**
    * Perform the procedure's explicit calculation.
    *
@@ -177,30 +200,40 @@ window.gmbCoreDensityModule = {
       ],
       stepMath: [
         {
-          stepName: "1. Calculate Bulk Volume",
-          formula: "Volume = SSD Mass (B) - Submerged Mass (C)",
-          calculation: `${B.toFixed(1)} g - ${C.toFixed(1)} g`,
-          result: `${volume.toFixed(1)} cm³`
+          workflowStep: 4,
+          stepName: "Step 4 — Calculate Bulk Volume",
+          formula: "Bulk Volume = Saturated Surface-Dry Weight (B) − Submerged Weight (C)",
+          calculation: `${B.toFixed(1)} g − ${C.toFixed(1)} g`,
+          result: `${volume.toFixed(1)} cm³`,
+          explanation: "The two measured weights are now combined to produce the bulk volume that the next calculations will use."
         },
         {
-          stepName: "2. Calculate Water Absorption",
-          formula: "Abs % = [(SSD Mass (B) - Dry Mass (A)) / Volume] × 100",
-          calculation: `[(${B.toFixed(1)} - ${A.toFixed(1)}) / ${volume.toFixed(1)}] × 100`,
-          result: `${waterAbsorptionPct.toFixed(2)}%`
+          workflowStep: 5,
+          stepName: "Step 5 — Calculate Bulk Specific Gravity (Gmb)",
+          formula: "Gmb = Dry Weight (A) ÷ Bulk Volume",
+          calculation: `${A.toFixed(1)} g ÷ ${volume.toFixed(1)} cm³`,
+          result: gmb.toFixed(3),
+          explanation: "The bulk-volume result from Step 4 is propagated directly into this division. We are not starting over or re-entering it."
         },
         {
-          stepName: "3. Calculate Bulk Specific Gravity (Gmb)",
-          formula: "Gmb = Dry Mass (A) / Bulk Volume",
-          calculation: `${A.toFixed(1)} g / ${volume.toFixed(1)} cm³`,
-          result: gmb.toFixed(3)
+          workflowStep: 6,
+          stepName: "Step 6 — Calculate Water Absorption",
+          formula: "Water Absorption = [(Saturated Surface-Dry Weight (B) − Dry Weight (A)) ÷ Bulk Volume] × 100",
+          calculation: `[(${B.toFixed(1)} − ${A.toFixed(1)}) ÷ ${volume.toFixed(1)}] × 100`,
+          result: `${waterAbsorptionPct.toFixed(2)}%`,
+          explanation: "The same bulk-volume result is reused here with the difference between the saturated surface-dry and dry weights."
         },
         {
-          stepName: "4. Compare Gmb to the Applicable GMM",
-          formula: "%GMM = Gmb / GMM × 100",
+          workflowStep: 7,
+          stepName: "Step 7 — Compare Gmb to the Applicable GMM",
+          formula: "Percent of GMM = Gmb ÷ GMM × 100",
           calculation: applicableGmm
-            ? `${gmb.toFixed(3)} / ${parseFloat(applicableGmm.value).toFixed(3)} × 100`
-            : "No applicable GMM test has been linked to this Core",
-          result: percentGmm === null ? "Pending GMM" : percentGmm.toFixed(2) + "%"
+            ? `${gmb.toFixed(3)} ÷ ${parseFloat(applicableGmm.value).toFixed(3)} × 100`
+            : "No applicable GMM is linked to this Core yet.",
+          result: percentGmm === null ? "Pending GMM" : percentGmm.toFixed(2) + "%",
+          explanation: applicableGmm
+            ? "The Gmb from Step 5 is propagated into the final comparison."
+            : "The calculation is ready, but the applicable GMM value has not been linked yet."
         }
       ]
     };
