@@ -158,6 +158,16 @@ class QCDataStore {
   }
 
   setField(target, key, value) {
+    // Rice/GMM records are independent records. They must not require a
+    // Core to exist before they can be edited.
+    if (target === "riceTest") {
+      const test = this.getRiceTest();
+      if (!test) return;
+      test[key] = value;
+      this.save();
+      return;
+    }
+
     const core = this.getCore();
     if (!core) return;
 
@@ -167,9 +177,6 @@ class QCDataStore {
       core.calculations[key] = value;
     } else if (target === "core.results") {
       core.results[key] = value;
-    } else if (target === "riceTest") {
-      const test = this.getRiceTest();
-      if (test) test[key] = value;
     }
 
     this.save();
