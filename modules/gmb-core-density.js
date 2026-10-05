@@ -1,10 +1,6 @@
 /**
  * AASHTO T 166: Bulk Specific Gravity (Gmb) of Compacted Asphalt
- * Module Data Schema & Execution Math (v1.0.3)
- *
- * AI CONTEXT: See modules/registry.js for the active application
- * dependency map, navigation metadata, and cross-file contracts before
- * modifying this module.
+ * Module Data Schema & Execution Math (v1.0.4)
  */
 window.gmbCoreDensityModule = {
   id: "gmb_core_density",
@@ -12,9 +8,6 @@ window.gmbCoreDensityModule = {
   parentModule: "Volumetric Properties",
   submodule: "AASHTO T 166 (Core Bulk Specific Gravity)",
 
-  // Descriptive metadata used by future workflow/navigation views.
-  // These relationships describe the procedure; they do not have to form
-  // a strict tree.
   metadata: {
     type: "test",
     category: ["testing", "laboratory", "volumetric_properties"],
@@ -25,7 +18,6 @@ window.gmbCoreDensityModule = {
     supports: ["density_reporting", "compaction_comparison"]
   },
 
-  // Input Definitions
   fields: [
     {
       id: "mass_dry",
@@ -53,22 +45,14 @@ window.gmbCoreDensityModule = {
     }
   ],
 
-  // Step Definitions aligned with framework-engine.js.
-  // Each step now carries relationship metadata so future navigation or
-  // workflow views can construct a graph from the procedure itself.
   steps: [
     {
       num: 1,
       title: "Dry Weight (A)",
       description: "Weigh the dry core in air before water immersion.",
       guidance: "Record dry core mass (A) to 0.1g after drying to constant mass at room temperature.",
-      learning: "Core must be dry to constant mass (less than 0.05% weight change over 2 hours) to ensure moisture does not artificially inflate initial mass.",
-      metadata: {
-        sequence: 10,
-        tags: ["measurement", "dry-mass"],
-        requires: ["prepared_core"],
-        supports: ["submerged_weight"]
-      }
+      learning: "Core must be dry to constant mass (<0.05% weight change over 2 hrs) to ensure moisture doesn't inflate initial mass.",
+      fieldId: "mass_dry"
     },
     {
       num: 2,
@@ -76,71 +60,90 @@ window.gmbCoreDensityModule = {
       description: "Submerge sample in water bath maintained at 77°F ± 1°F.",
       guidance: "Immerse sample in 77°F ± 1°F water bath for 4 ± 1 minutes, tare scale suspension rig, and record mass (C).",
       learning: "Water bath temperature controls binder viscosity and water density during volume displacement measurement.",
-      metadata: {
-        sequence: 20,
-        tags: ["measurement", "submerged-mass"],
-        requires: ["mass_dry"],
-        supports: ["ssd_weight"]
-      }
+      fieldId: "mass_submerged"
     },
     {
       num: 3,
       title: "SSD Weight (B)",
       description: "Blot surface water with a damp towel and weigh immediately.",
-      guidance: "Damp-dry surface water quickly with a damp towel (do not wipe water out of void spaces) and record SSD mass (B) within 15 seconds.",
+      guidance: "Damp-dry surface water quickly with a damp towel and record SSD mass (B) within 15 seconds.",
       learning: "Surface water must be blotted off without pulling absorbed water out of internal core voids.",
-      metadata: {
-        sequence: 30,
-        tags: ["measurement", "ssd-mass"],
-        requires: ["mass_submerged"],
-        supports: ["gmb_calculation"]
-      }
+      fieldId: "mass_ssd"
+    },
+    {
+      num: 4,
+      title: "Volumetric Breakdown & Gmb Computation",
+      description: "Calculate volume displacement (B - C) and specific gravity (A / Volume).",
+      guidance: "Review the step-by-step arithmetic below to verify raw weights before committing to ground truth.",
+      learning: "Bulk volume is measured by water displacement: Volume = SSD Mass (B) - Submerged Mass (C)."
     }
   ],
 
-  // Calculation Engine returning direct array for renderResultsBar().
   compute: function(data) {
     const A = parseFloat(data.mass_dry);
     const C = parseFloat(data.mass_submerged);
     const B = parseFloat(data.mass_ssd);
 
     if (isNaN(A) || isNaN(B) || isNaN(C) || A <= 0 || B <= 0 || C < 0) {
-      return [
-        { label: "Bulk Volume (cm³)", value: "—" },
-        { label: "Water Absorption (%)", value: "—" },
-        { label: "Bulk Specific Gravity (Gmb)", value: "—" }
-      ];
+      return {
+        isComplete: false,
+        results: [
+          { label: "Bulk Volume (cm³)", value: "—" },
+          { label: "Water Absorption (%)", value: "—" },
+          { label: "Bulk Specific Gravity (Gmb)", value: "—" }
+        ],
+        stepMath: []
+      };
     }
 
     if (B < A || B <= C) {
-      return [
-        { label: "Bulk Volume (cm³)", value: "Invalid SSD/Submerged Mass" },
-        { label: "Water Absorption (%)", value: "Invalid SSD/Submerged Mass" },
-        { label: "Bulk Specific Gravity (Gmb)", value: "Invalid SSD/Submerged Mass" }
-      ];
+      return {
+        isComplete: false,
+        error: "Invalid SSD/Submerged mass sequence (B must be ≥ A and > C).",
+        results: [
+          { label: "Bulk Volume (cm³)", value: "Invalid Inputs" },
+          { label: "Water Absorption (%)", value: "Invalid Inputs" },
+          { label: "Bulk Specific Gravity (Gmb)", value: "Invalid Inputs" }
+        ],
+        stepMath: []
+      };
     }
 
     const volume = B - C;
     const gmb = A / volume;
     const waterAbsorptionPct = ((B - A) / volume) * 100;
 
-    return [
-      {
-        label: "Bulk Volume (cm³)",
-        value: volume.toFixed(1)
-      },
-      {
-        label: "Water Absorption (%)",
-        value: waterAbsorptionPct.toFixed(2) + (waterAbsorptionPct > 2.0 ? " (>2.0% - Consider T 275)" : "")
-      },
-      {
-        label: "Bulk Specific Gravity (Gmb)",
-        value: gmb.toFixed(3)
-      }
-    ];
+    return {
+      isComplete: true,
+      results: [
+        { label: "Bulk Volume (cm³)", value: volume.toFixed(1) },
+        { label: "Water Absorption (%)", value: waterAbsorptionPct.toFixed(2) + (waterAbsorptionPct > 2.0 ? " (>2.0% - Consider T 275)" : "") },
+        { label: "Bulk Specific Gravity (Gmb)", value: gmb.toFixed(3) }
+      ],
+      // Explicit breakdown for Interactive whiteboard rendering
+      stepMath: [
+        {
+          stepName: "1. Calculate Bulk Volume (cm³)",
+          formula: "Volume = SSD Mass (B) - Submerged Mass (C)",
+          calculation: `${B.toFixed(1)} g - ${C.toFixed(1)} g`,
+          result: `${volume.toFixed(1)} cm³`
+        },
+        {
+          stepName: "2. Calculate Water Absorption (%)",
+          formula: "Abs % = [(SSD Mass (B) - Dry Mass (A)) / Volume] × 100",
+          calculation: `[(${B.toFixed(1)} - ${A.toFixed(1)}) / ${volume.toFixed(1)}] × 100`,
+          result: `${waterAbsorptionPct.toFixed(2)}%`
+        },
+        {
+          stepName: "3. Calculate Bulk Specific Gravity (Gmb)",
+          formula: "Gmb = Dry Mass (A) / Bulk Volume",
+          calculation: `${A.toFixed(1)} g / ${volume.toFixed(1)} cm³`,
+          result: gmb.toFixed(3)
+        }
+      ]
+    };
   }
 };
 
-// Register module into global framework lookup table
 window.QC_LOADED_MODULES = window.QC_LOADED_MODULES || {};
 window.QC_LOADED_MODULES["gmb_core_density"] = window.gmbCoreDensityModule;
