@@ -53,10 +53,14 @@
 
   <!--
     LOAD ORDER MATTERS:
-    1. framework-engine.js defines QCLabFramework.
-    2. registry.js defines which modules exist.
-    3. initApp() below creates the framework and loads the registered modules.
+    1. data-model.js creates the shared project/test data store.
+    2. framework-engine.js defines QCLabFramework.
+    3. registry.js defines which procedure modules exist.
+    4. initApp() below creates the framework and loads the registered modules.
   -->
+  <!-- Shared application data must exist before the framework starts. -->
+  <script src="data-model.js?v=2.0.0"></script>
+
   <!-- Core Scripts -->
   <script src="framework-engine.js"></script>
   <script src="modules/registry.js?v=1.0.0"></script>
@@ -260,7 +264,9 @@
       }
     }
 
-    // Main startup sequence. In plain English: create engine → connect menu → build navigation → load modules → show first module.
+    // Main startup sequence. In plain English:
+    // create shared data store → create engine → connect menu → build navigation
+    // → load procedure modules → show the first module.
     async function initApp() {
       // Create the one framework controller used by the whole page. window.QC is global because generated buttons call QC.* methods.
       // 1. Instantiate Core Engine Singleton
