@@ -1,6 +1,8 @@
 /**
- * Lab Framework - Procedural Knowledge Engine (v0.4.0 - Step-by-Step Wizard)
- * Sequential subtask progression with standalone entry capabilities.
+ * Lab Framework - Procedural Knowledge Engine (v0.5.0 - Multi-View Architecture)
+ * - Restores Detail Depth toggle bar (Speed Mode, Interactive Wizard, Expand All).
+ * - Maintains single unified state engine across step views and expanded views.
+ * - Auto-syncs live inputs between layout shifts.
  */
 
 const coreDensityProcedure = {
@@ -9,6 +11,7 @@ const coreDensityProcedure = {
   parentModule: "Asphalt Field & Lab Quality Control",
   submodule: "Lab Testing & Specific Gravity",
   
+  // Master input schema mapped to steps
   steps: [
     {
       id: "prep",
@@ -65,9 +68,10 @@ const coreDensityProcedure = {
   ]
 };
 
-class WizardEngine {
+class ProcedureEngine {
   constructor(schema) {
     this.schema = schema;
+    this.viewMode = "interactive"; // "speed", "interactive", or "learning"
     this.currentStepIndex = 0;
     this.values = this.loadDraftState() || {
       station_location: "",
@@ -133,7 +137,7 @@ class WizardEngine {
   commitToBook() {
     const res = this.calculate();
     if (res.Gmb === "—") {
-      alert("Missing core weights. Please complete all step inputs.");
+      alert("Missing core weights. Please complete required inputs.");
       return;
     }
 
@@ -149,10 +153,20 @@ class WizardEngine {
     this.saveLedgerState();
     alert(`Result committed to book! Total logged records: ${this.ledger.length}`);
   }
+
+  // Flattens all step inputs for Speed and Learning views
+  getAllInputs() {
+    return this.schema.steps.flatMap(s => s.inputs.map(i => ({
+      ...i,
+      stepTitle: s.title,
+      guidance: s.guidance,
+      learning: s.learning
+    })));
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const engine = new WizardEngine(coreDensityProcedure);
+  const engine = new ProcedureEngine(coreDensityProcedure);
   const workspace = document.getElementById("procedural-workspace");
   const menuButton = document.querySelector(".menu-button");
   const sidebar = document.querySelector(".sidebar");
@@ -160,60 +174,31 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!workspace) return;
   if (menuButton) menuButton.addEventListener("click", () => sidebar.classList.toggle("open"));
 
-  function renderWizard() {
-    const step = engine.schema.steps[engine.currentStepIndex];
-    const totalSteps = engine.schema.steps.length;
+  function renderApp() {
     const results = engine.calculate();
-    const isLastStep = engine.currentStepIndex === totalSteps - 1;
+    const allInputs = engine.getAllInputs();
 
     workspace.innerHTML = `
       <div style="margin-bottom: 12px; font-size: 0.85rem; opacity: 0.8;">
         Module: <strong>${engine.schema.parentModule}</strong> &gt; <strong>${engine.schema.submodule}</strong>
       </div>
 
-      <div class="form-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <h2 style="font-size: 1.1rem; margin: 0;">${step.title}</h2>
-          <span style="font-size: 0.85rem; font-weight: bold;">Step ${engine.currentStepIndex + 1} of ${totalSteps}</span>
-        </div>
-
-        <p style="margin-bottom: 16px; color: #a0a0a0;">${step.description}</p>
-
-        <div class="form-grid" style="margin-bottom: 16px;">
-          ${step.inputs.map(input => `
-            <div class="input-block">
-              <label>${input.label}${input.unit ? `(${input.unit})` : ''}</label>
-              <input 
-                data-key="${input.key}" 
-                class="number-input core-input" 
-                type="${input.type}" 
-                placeholder="${input.placeholder}" 
-                value="${engine.values[input.key] ?? ''}"
-              >
-            </div>
-          `).join('')}
-        </div>
-
-        <details class="disclosure" open style="margin-bottom: 16px;">
-          <summary>Step Guidance & Concept</summary>
-          <div class="disclosure-body">
-            <p style="margin-bottom: 4px;"><strong>Action Guidance:</strong> ${step.guidance}</p>
-            <p style="margin-bottom: 0;"><strong>Technical Principle:</strong> ${step.learning}</p>
-          </div>
-        </details>
-
-        <div style="display: flex; gap: 8px; justify-content: space-between;">
-          <button id="prev-btn" class="secondary" ${engine.currentStepIndex === 0 ? 'disabled' : ''}>&larr; Previous Step</button>
-          ${isLastStep ? `
-            <button id="commit-btn" class="primary">Commit Result to Book</button>
-          ` : `
-            <button id="next-btn" class="primary">Next Step &rarr;</button>
-          `}
+      <!-- Mode Selector Controls -->
+      <div class="form-card" style="margin-bottom: 16px; padding: 12px;">
+        <label style="font-size: 0.85rem; font-weight: bold; margin-bottom: 8px; display: block;">Detail Depth:</label>
+        <div style="display: flex; gap: 8px;">
+          <button class="mode-btn secondary ${engine.viewMode === 'speed' ? 'active' : ''}" data-mode="speed" style="flex: 1;">Speed Mode</button>
+          <button class="mode-btn secondary ${engine.viewMode === 'interactive' ? 'active' : ''}" data-mode="interactive" style="flex: 1;">Interactive</button>
+          <button class="mode-btn secondary ${engine.viewMode === 'learning' ? 'active' : ''}" data-mode="learning" style="flex: 1;">Expand All (Learning)</button>
         </div>
       </div>
 
+      <!-- View Content Area -->
+      <div id="view-content"></div>
+
+      <!-- Running Calculation Summary -->
       <div class="results-card" style="margin-top: 16px;">
-        <h3 style="font-size: 1rem; margin-bottom: 12px;">Running Calculation Summary</h3>
+        <h3 style="font-size: 1rem; margin-bottom: 12px;">Calculated Results</h3>
         <div class="results-grid">
           <div class="result-item"><span>Displaced Vol</span><strong>${results.volume} cm³</strong></div>
           <div class="result-item"><span>Bulk Gravity (Gmb)</span><strong>${results.Gmb}</strong></div>
@@ -221,10 +206,104 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="result-item"><span>Bulk Density</span><strong>${results.bulkDensityPcf} pcf</strong></div>
           <div class="result-item"><span>PQI Offset</span><strong>${results.pqiOffset} pcf</strong></div>
         </div>
+        <div style="margin-top: 16px; text-align: right;">
+          <button id="commit-btn" class="primary">Commit Result to Book</button>
+        </div>
       </div>
     `;
 
-    // Rebind Input Listeners
+    renderViewContent();
+    bindEvents();
+  }
+
+  function renderViewContent() {
+    const container = document.getElementById("view-content");
+    if (!container) return;
+
+    if (engine.viewMode === "interactive") {
+      const step = engine.schema.steps[engine.currentStepIndex];
+      const totalSteps = engine.schema.steps.length;
+      const isLastStep = engine.currentStepIndex === totalSteps - 1;
+
+      container.innerHTML = `
+        <div class="form-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h2 style="font-size: 1.1rem; margin: 0;">${step.title}</h2>
+            <span style="font-size: 0.85rem; font-weight: bold;">Step ${engine.currentStepIndex + 1} of ${totalSteps}</span>
+          </div>
+          <p style="margin-bottom: 16px; color: #a0a0a0;">${step.description}</p>
+          <div class="form-grid" style="margin-bottom: 16px;">
+            ${step.inputs.map(input => renderInputField(input)).join('')}
+          </div>
+          <details class="disclosure" open style="margin-bottom: 16px;">
+            <summary>Step Guidance & Concept</summary>
+            <div class="disclosure-body">
+              <p style="margin-bottom: 4px;"><strong>Action Guidance:</strong> ${step.guidance}</p>
+              <p style="margin-bottom: 0;"><strong>Technical Principle:</strong> ${step.learning}</p>
+            </div>
+          </details>
+          <div style="display: flex; gap: 8px; justify-content: space-between;">
+            <button id="prev-btn" class="secondary" ${engine.currentStepIndex === 0 ? 'disabled' : ''}>&larr; Previous Step</button>
+            <button id="next-btn" class="primary" ${isLastStep ? 'disabled' : ''}>${isLastStep ? 'Final Step' : 'Next Step &rarr;'}</button>
+          </div>
+        </div>
+      `;
+    } else if (engine.viewMode === "speed") {
+      const allInputs = engine.getAllInputs();
+      container.innerHTML = `
+        <div class="form-card">
+          <h2 style="font-size: 1.1rem; margin-bottom: 12px;">Speed Data Entry</h2>
+          <div class="form-grid">
+            ${allInputs.map(input => renderInputField(input)).join('')}
+          </div>
+        </div>
+      `;
+    } else if (engine.viewMode === "learning") {
+      container.innerHTML = `
+        <div class="form-card">
+          <h2 style="font-size: 1.1rem; margin-bottom: 16px;">Full Procedural Reference (Expanded)</h2>
+          ${engine.schema.steps.map(step => `
+            <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #333;">
+              <h3 style="font-size: 1rem; margin-bottom: 8px;">${step.title}</h3>
+              <div class="form-grid" style="margin-bottom: 12px;">
+                ${step.inputs.map(input => renderInputField(input)).join('')}
+              </div>
+              <div class="disclosure-body" style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 4px;">
+                <p style="margin-bottom: 4px;"><strong>Guidance:</strong> ${step.guidance}</p>
+                <p style="margin-bottom: 0;"><strong>Principle:</strong> ${step.learning}</p>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+  }
+
+  function renderInputField(input) {
+    return `
+      <div class="input-block">
+        <label>${input.label} ${input.unit ? `(${input.unit})` : ''}</label>
+        <input 
+          data-key="${input.key}" 
+          class="number-input core-input" 
+          type="${input.type}" 
+          placeholder="${input.placeholder}" 
+          value="${engine.values[input.key] ?? ''}"
+        >
+      </div>
+    `;
+  }
+
+  function bindEvents() {
+    // Mode Switcher Listeners
+    document.querySelectorAll(".mode-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        engine.viewMode = e.target.getAttribute("data-mode");
+        renderApp();
+      });
+    });
+
+    // Input Change Listeners
     document.querySelectorAll(".core-input").forEach(input => {
       input.addEventListener("input", (e) => {
         const key = e.target.getAttribute("data-key");
@@ -233,7 +312,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
 
-    // Navigation Controls
+    // Wizard Navigation Listeners
     const prevBtn = document.getElementById("prev-btn");
     const nextBtn = document.getElementById("next-btn");
     const commitBtn = document.getElementById("commit-btn");
@@ -241,14 +320,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (prevBtn) prevBtn.addEventListener("click", () => {
       if (engine.currentStepIndex > 0) {
         engine.currentStepIndex--;
-        renderWizard();
+        renderApp();
       }
     });
 
     if (nextBtn) nextBtn.addEventListener("click", () => {
-      if (engine.currentStepIndex < totalSteps - 1) {
+      if (engine.currentStepIndex < engine.schema.steps.length - 1) {
         engine.currentStepIndex++;
-        renderWizard();
+        renderApp();
       }
     });
 
@@ -267,5 +346,5 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  renderWizard();
+  renderApp();
 });
