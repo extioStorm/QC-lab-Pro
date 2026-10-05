@@ -1,301 +1,182 @@
-<script>
-  // Timestamp-based script loader.
-  function loadScript(src) {
-    return new Promise((resolve, reject) => {
-      const cleanSrc = src.split('?')[0];
-      const cacheBustedSrc = `${cleanSrc}?v=${Date.now()}`;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QC Lab Procedural App</title>
 
-      if (document.querySelector(`script[src^="${cleanSrc}"]`)) {
-        return resolve();
-      }
+  <!-- Eruda Dev Tools (Mobile Debugger) -->
+  <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+  <script>eruda.init();</script>
 
-      const script = document.createElement("script");
-      script.src = cacheBustedSrc;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error(`Failed to load script: ${cacheBustedSrc}`));
-      document.body.appendChild(script);
-    });
-  }
+  <!-- Framework Styles -->
+  <link rel="stylesheet" href="framework-style.css">
+</head>
+<body>
 
-  function closeNavigation() {
-    document.getElementById("nav-drawer").classList.remove("open");
-    document.getElementById("nav-overlay").classList.remove("active");
-  }
+  <!-- Top App Bar / Header -->
+  <header class="app-header">
+    <button id="menu-toggle" class="icon-btn" aria-label="Open Navigation">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+    <h1 class="app-title">QC Lab Framework</h1>
+  </header>
 
-  function clearActiveNavigation() {
-    document.querySelectorAll("#navigation-tree .nav-item.active")
-      .forEach(el => el.classList.remove("active"));
-  }
+  <!-- Navigation Drawer Overlay -->
+  <div id="nav-overlay" class="nav-overlay"></div>
 
-  function createNavItem(label, className, onClick) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = className;
-    button.textContent = label;
-    if (onClick) button.addEventListener("click", onClick);
-    return button;
-  }
+  <!-- Navigation Drawer -->
+  <aside id="nav-drawer" class="nav-drawer">
+    <div class="nav-header">
+      <h2>Navigation</h2>
+    </div>
+    <nav id="navigation-tree" class="navigation-tree">
+      <!-- Dynamically generated navigation tree -->
+    </nav>
+  </aside>
 
-  function renderNavigationTree() {
-    const container = document.getElementById("navigation-tree");
-    container.innerHTML = "";
+  <!-- Main Application Root Container -->
+  <main id="qc-framework-root" class="framework-root-container">
+    <!-- framework-engine.js mounts active modules here -->
+  </main>
 
-    const sections = [...(window.QC_NAVIGATION?.sections || [])]
-      .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+  <!-- Core Scripts -->
+  <script src="framework-engine.js"></script>
+  <script src="modules/registry.js?v=1.0.0"></script>
 
-    for (const section of sections) {
-      const sectionBlock = document.createElement("section");
-      sectionBlock.className = "nav-section";
-      sectionBlock.dataset.sectionId = section.id;
+  <!-- Application Setup & Navigation Script -->
+  <script>
+    // Timestamp-based script loader.
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const cleanSrc = src.split('?')[0];
+        const cacheBustedSrc = `${cleanSrc}?v=${Date.now()}`;
 
-      const sectionButton = createNavItem(
-        section.title,
-        "nav-section-title",
-        () => sectionBlock.classList.toggle("expanded")
-      );
-      sectionButton.setAttribute("aria-expanded", "true");
-      sectionBlock.classList.add("expanded");
-
-      const sectionChildren = document.createElement("div");
-      sectionChildren.className = "nav-section-children";
-
-      // 1. WORKDAY CHRONOLOGICAL PROJECTION
-      if (section.childrenFrom === "QC_MODULES_WORKDAY") {
-        const workdayModules = [...(window.QC_MODULES || [])]
-          .sort((a, b) => (a.workflow?.chronologicalOrder || 0) - (b.workflow?.chronologicalOrder || 0));
-
-        const workdayGroup = document.createElement("div");
-        workdayGroup.className = "nav-group expanded";
-
-        const workdayGroupChildren = document.createElement("div");
-        workdayGroupChildren.className = "nav-group-children";
-
-        workdayModules.forEach(item => {
-          const moduleButton = createNavItem(
-            `⏱️ ${item.title}`,
-            "nav-item nav-indent-1",
-            () => {
-              const moduleData = window.QC_LOADED_MODULES?.[item.id];
-
-              if (!moduleData) {
-                console.warn(`Module "${item.id}" is not loaded yet.`);
-                return;
-              }
-
-              clearActiveNavigation();
-              moduleButton.classList.add("active");
-              window.QC.mountModule(moduleData);
-              closeNavigation();
-            }
-          );
-
-          moduleButton.dataset.moduleId = item.id;
-          workdayGroupChildren.appendChild(moduleButton);
-        });
-
-        workdayGroup.appendChild(workdayGroupChildren);
-        sectionChildren.appendChild(workdayGroup);
-
-      // 2. STANDARD LAB TAXONOMY PROJECTION (Testing)
-      } else if (section.childrenFrom === "QC_MODULES") {
-        const modules = [...(window.QC_MODULES || [])]
-          .filter(item => item.navigation?.section === section.id)
-          .sort((a, b) => (a.navigation?.sequence || 0) - (b.navigation?.sequence || 0));
-
-        const modulesGroup = document.createElement("div");
-        modulesGroup.className = "nav-group expanded";
-
-        const modulesButton = createNavItem(
-          "Modules",
-          "nav-group-title",
-          () => modulesGroup.classList.toggle("expanded")
-        );
-        modulesButton.setAttribute("aria-expanded", "true");
-        modulesGroup.appendChild(modulesButton);
-
-        const categoryGroups = new Map();
-
-        for (const item of modules) {
-          const nav = item.navigation || {};
-          const categoryId = nav.category || "other";
-          const categoryTitle = nav.categoryTitle || categoryId;
-
-          if (!categoryGroups.has(categoryId)) {
-            categoryGroups.set(categoryId, {
-              title: categoryTitle,
-              sequence: nav.categorySequence || 0,
-              modules: []
-            });
-          }
-
-          categoryGroups.get(categoryId).modules.push(item);
+        if (document.querySelector(`script[src^="${cleanSrc}"]`)) {
+          return resolve();
         }
 
-        const categoryContainer = document.createElement("div");
-        categoryContainer.className = "nav-group-children";
+        const script = document.createElement("script");
+        script.src = cacheBustedSrc;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`Failed to load script: ${cacheBustedSrc}`));
+        document.body.appendChild(script);
+      });
+    }
 
-        [...categoryGroups.entries()]
-          .sort((a, b) => (a[1].sequence || 0) - (b[1].sequence || 0))
-          .forEach(([categoryId, category]) => {
-            const categoryGroup = document.createElement("div");
-            categoryGroup.className = "nav-group expanded";
-            categoryGroup.dataset.categoryId = categoryId;
+    function closeNavigation() {
+      document.getElementById("nav-drawer").classList.remove("open");
+      document.getElementById("nav-overlay").classList.remove("active");
+    }
 
-            const categoryButton = createNavItem(
-              category.title,
-              "nav-group-title nav-indent-1",
-              () => categoryGroup.classList.toggle("expanded")
-            );
-            categoryButton.setAttribute("aria-expanded", "true");
-            categoryGroup.appendChild(categoryButton);
+    function clearActiveNavigation() {
+      document.querySelectorAll("#navigation-tree .nav-item.active")
+        .forEach(el => el.classList.remove("active"));
+    }
 
-            const categoryChildren = document.createElement("div");
-            categoryChildren.className = "nav-group-children";
+    function createNavItem(label, className, onClick) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = className;
+      button.textContent = label;
+      if (onClick) button.addEventListener("click", onClick);
+      return button;
+    }
 
-            const procedures = new Map();
+    function renderNavigationTree() {
+      const container = document.getElementById("navigation-tree");
+      container.innerHTML = "";
 
-            category.modules.forEach(item => {
-              const nav = item.navigation || {};
-              const procedureId = nav.procedure || item.id;
-              const procedureTitle = nav.procedureTitle || item.title;
+      const sections = [...(window.QC_NAVIGATION?.sections || [])]
+        .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
 
-              if (!procedures.has(procedureId)) {
-                procedures.set(procedureId, {
-                  title: procedureTitle,
-                  sequence: nav.procedureSequence || 0,
-                  modules: []
-                });
+      for (const section of sections) {
+        const sectionBlock = document.createElement("section");
+        sectionBlock.className = "nav-section";
+        sectionBlock.dataset.sectionId = section.id;
+
+        const sectionButton = createNavItem(
+          section.title,
+          "nav-section-title",
+          () => sectionBlock.classList.toggle("expanded")
+        );
+        sectionButton.setAttribute("aria-expanded", "true");
+        sectionBlock.classList.add("expanded");
+
+        const sectionChildren = document.createElement("div");
+        sectionChildren.className = "nav-section-children";
+
+        // 1. WORKDAY CHRONOLOGICAL PROJECTION
+        if (section.childrenFrom === "QC_MODULES_WORKDAY") {
+          const workdayModules = [...(window.QC_MODULES || [])]
+            .sort((a, b) => (a.workflow?.chronologicalOrder || 0) - (b.workflow?.chronologicalOrder || 0));
+
+          const workdayGroup = document.createElement("div");
+          workdayGroup.className = "nav-group expanded";
+
+          const workdayGroupChildren = document.createElement("div");
+          workdayGroupChildren.className = "nav-group-children";
+
+          workdayModules.forEach(item => {
+            const moduleButton = createNavItem(
+              `⏱️ ${item.title}`,
+              "nav-item nav-indent-1",
+              () => {
+                const moduleData = window.QC_LOADED_MODULES?.[item.id];
+
+                if (!moduleData) {
+                  console.warn(`Module "${item.id}" is not loaded yet.`);
+                  return;
+                }
+
+                clearActiveNavigation();
+                moduleButton.classList.add("active");
+                window.QC.mountModule(moduleData);
+                closeNavigation();
               }
+            );
 
-              procedures.get(procedureId).modules.push(item);
-            });
-
-            [...procedures.entries()]
-              .sort((a, b) => (a[1].sequence || 0) - (b[1].sequence || 0))
-              .forEach(([procedureId, procedure]) => {
-                const procedureGroup = document.createElement("div");
-                procedureGroup.className = "nav-group expanded";
-                procedureGroup.dataset.procedureId = procedureId;
-
-                const procedureButton = createNavItem(
-                  procedure.title,
-                  "nav-group-title nav-indent-2",
-                  () => procedureGroup.classList.toggle("expanded")
-                );
-                procedureButton.setAttribute("aria-expanded", "true");
-                procedureGroup.appendChild(procedureButton);
-
-                const procedureChildren = document.createElement("div");
-                procedureChildren.className = "nav-group-children";
-
-                procedure.modules
-                  .sort((a, b) => (a.navigation?.sequence || 0) - (b.navigation?.sequence || 0))
-                  .forEach(item => {
-                    const moduleButton = createNavItem(
-                      item.title,
-                      "nav-item nav-indent-3",
-                      () => {
-                        const moduleData = window.QC_LOADED_MODULES?.[item.id];
-
-                        if (!moduleData) {
-                          console.warn(`Module "${item.id}" is not loaded yet.`);
-                          return;
-                        }
-
-                        clearActiveNavigation();
-                        moduleButton.classList.add("active");
-                        window.QC.mountModule(moduleData);
-                        closeNavigation();
-                      }
-                    );
-
-                    moduleButton.dataset.moduleId = item.id;
-                    procedureChildren.appendChild(moduleButton);
-                  });
-
-                procedureGroup.appendChild(procedureChildren);
-                categoryChildren.appendChild(procedureGroup);
-              });
-
-            categoryGroup.appendChild(categoryChildren);
-            categoryContainer.appendChild(categoryGroup);
+            moduleButton.dataset.moduleId = item.id;
+            workdayGroupChildren.appendChild(moduleButton);
           });
 
-        modulesGroup.appendChild(categoryContainer);
-        sectionChildren.appendChild(modulesGroup);
-      } else {
-        const placeholder = document.createElement("div");
-        placeholder.className = "nav-placeholder";
-        placeholder.textContent = "No items configured yet";
-        sectionChildren.appendChild(placeholder);
-      }
+          workdayGroup.appendChild(workdayGroupChildren);
+          sectionChildren.appendChild(workdayGroup);
 
-      sectionBlock.appendChild(sectionButton);
-      sectionBlock.appendChild(sectionChildren);
-      container.appendChild(sectionBlock);
-    }
-  }
+        // 2. STANDARD LAB TAXONOMY PROJECTION (Testing)
+        } else if (section.childrenFrom === "QC_MODULES") {
+          const modules = [...(window.QC_MODULES || [])]
+            .filter(item => item.navigation?.section === section.id)
+            .sort((a, b) => (a.navigation?.sequence || 0) - (b.navigation?.sequence || 0));
 
-  document.addEventListener("DOMContentLoaded", async () => {
-    // 1. Initialize Engine
-    window.QC = new QCLabFramework("qc-framework-root");
-    window.QC_LOADED_MODULES = {};
+          const modulesGroup = document.createElement("div");
+          modulesGroup.className = "nav-group expanded";
 
-    // 2. Navigation Drawer Toggle Controls
-    const drawer = document.getElementById("nav-drawer");
-    const overlay = document.getElementById("nav-overlay");
-    const toggleBtn = document.getElementById("menu-toggle");
+          const modulesButton = createNavItem(
+            "Modules",
+            "nav-group-title",
+            () => modulesGroup.classList.toggle("expanded")
+          );
+          modulesButton.setAttribute("aria-expanded", "true");
+          modulesGroup.appendChild(modulesButton);
 
-    toggleBtn.addEventListener("click", () => {
-      drawer.classList.add("open");
-      overlay.classList.add("active");
-    });
+          const categoryGroups = new Map();
 
-    overlay.addEventListener("click", closeNavigation);
+          for (const item of modules) {
+            const nav = item.navigation || {};
+            const categoryId = nav.category || "other";
+            const categoryTitle = nav.categoryTitle || categoryId;
 
-    // 3. Build navigation from registry metadata.
-    renderNavigationTree();
+            if (!categoryGroups.has(categoryId)) {
+              categoryGroups.set(categoryId, {
+                title: categoryTitle,
+                sequence: nav.categorySequence || 0,
+                modules: []
+              });
+            }
 
-    if (!window.QC_MODULES || window.QC_MODULES.length === 0) {
-      return;
-    }
-
-    // 4. Load registered modules and keep their runtime objects separate
-    // from the registry metadata.
-    for (let i = 0; i < window.QC_MODULES.length; i++) {
-      const item = window.QC_MODULES[i];
-
-      try {
-        await loadScript(item.script);
-        const moduleData = window[item.objectName];
-
-        if (moduleData) {
-          window.QC_LOADED_MODULES[item.id] = moduleData;
-        } else {
-          console.error(`Object window["${item.objectName}"] not found after loading ${item.script}`);
-        }
-      } catch (err) {
-        console.error(`Error loading module ${item.id}:`, err);
-      }
-    }
-
-    // Re-render navigation tree after scripts load so click handlers bind to live module objects
-    renderNavigationTree();
-
-    // 5. Mount the first registered module by default.
-    const firstModule = window.QC_MODULES[0];
-    const firstModuleData = window.QC_LOADED_MODULES[firstModule?.id];
-
-    if (firstModuleData) {
-      const firstNavItem = document.querySelector(
-        `#navigation-tree .nav-item[data-module-id="${firstModule.id}"]`
-      );
-
-      if (firstNavItem) {
-        firstNavItem.classList.add("active");
-      }
-
-      window.QC.mountModule(firstModuleData);
-    }
-  });
-</script>
+            categoryGroups.
