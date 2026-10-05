@@ -45,7 +45,8 @@ class QCDataStore {
     this.context = this.loadContext() || {
       projectId: "PROJECT-1",
       sessionId: "DAY-1",
-      coreId: null
+      coreId: null,
+      riceTestId: null
     };
   }
 
@@ -93,6 +94,27 @@ class QCDataStore {
     return this.getSession()?.riceTests || {};
   }
 
+  getRiceTest() {
+    const tests = this.getRiceTests();
+    if (!this.context.riceTestId) return null;
+    return tests[this.context.riceTestId] || null;
+  }
+
+  ensureRiceTest(testId) {
+    const session = this.getSession();
+    if (!session || !testId) return null;
+
+    if (!session.riceTests[testId]) {
+      session.riceTests[testId] = {
+        id: String(testId),
+        label: String(testId),
+        gmm: null
+      };
+    }
+
+    return session.riceTests[testId];
+  }
+
   ensureCore(coreId) {
     const session = this.getSession();
     if (!session || !coreId) return null;
@@ -130,6 +152,7 @@ class QCDataStore {
     if (target === "core.measurements") return this.getCore()?.measurements?.[key];
     if (target === "core.calculations") return this.getCore()?.calculations?.[key];
     if (target === "core.results") return this.getCore()?.results?.[key];
+    if (target === "riceTest") return this.getRiceTest()?.[key];
 
     return undefined;
   }
@@ -144,6 +167,9 @@ class QCDataStore {
       core.calculations[key] = value;
     } else if (target === "core.results") {
       core.results[key] = value;
+    } else if (target === "riceTest") {
+      const test = this.getRiceTest();
+      if (test) test[key] = value;
     }
 
     this.save();
