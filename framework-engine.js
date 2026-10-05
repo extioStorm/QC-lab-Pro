@@ -1,107 +1,217 @@
 /**
- * AASHTO T 166: Bulk Specific Gravity (Gmb) of Compacted Asphalt
- * Aligned with QC Lab Framework Engine (v1.0.0)
+ * QC Lab Framework Engine (v1.0.0)
+ * Declarative UI & Calculation Engine
  */
-window.gmbCoreDensityModule = {
-  id: "gmb_core_density",
-  title: "AASHTO T 166 (Core Gmb)",
-  parentModule: "Volumetric Properties",
-  submodule: "AASHTO T 166 (Core Bulk Specific Gravity)",
-  
-  // Input Definitions mapped to step numbers (stepNum)
-  fields: [
-    {
-      id: "mass_dry",
-      label: "Dry Mass in Air (A)",
-      unit: "g",
-      type: "number",
-      placeholder: "e.g. 1250.4",
-      stepNum: 1
-    },
-    {
-      id: "mass_submerged",
-      label: "Submerged Mass in Water (C)",
-      unit: "g",
-      type: "number",
-      placeholder: "e.g. 732.1",
-      stepNum: 2
-    },
-    {
-      id: "mass_ssd",
-      label: "Saturated Surface-Dry Mass (B)",
-      unit: "g",
-      type: "number",
-      placeholder: "e.g. 1253.8",
-      stepNum: 3
-    }
-  ],
-
-  // Step Definitions matching engine property names (num, title, description, guidance, learning)
-  steps: [
-    {
-      num: 1,
-      title: "Dry Weight (A)",
-      description: "Weigh the dry core in air before water immersion.",
-      guidance: "Record dry mass (A) to 0.1g after core reaches constant mass at room temperature.",
-      learning: "Core must be dry to constant mass (less than 0.05% weight change over 2 hours) to ensure moisture does not artificially inflate initial mass."
-    },
-    {
-      num: 2,
-      title: "Submerged Weight (C)",
-      description: "Submerge sample in water bath maintained at 77°F ± 1°F.",
-      guidance: "Immerse sample in 77°F water bath for 4 ± 1 minutes, tare suspension rig, and record mass (C).",
-      learning: "Water bath temperature controls binder viscosity and water density during volume displacement measurement."
-    },
-    {
-      num: 3,
-      title: "SSD Weight (B)",
-      description: "Blot surface water with a damp towel and weigh immediately.",
-      guidance: "Damp-dry surface water quickly with a damp towel and record SSD mass (B) within 15 seconds.",
-      learning: "Surface water must be blotted off without pulling absorbed water out of internal core voids."
-    }
-  ],
-
-  // Calculation Engine returning a direct array expected by renderResultsBar()
-  compute: function(data) {
-    const A = parseFloat(data.mass_dry);
-    const C = parseFloat(data.mass_submerged);
-    const B = parseFloat(data.mass_ssd);
-
-    // Default response if incomplete
-    if (isNaN(A) || isNaN(B) || isNaN(C) || A <= 0 || B <= 0 || C < 0) {
-      return [
-        { label: "Bulk Volume (cm³)", value: "—" },
-        { label: "Water Absorption (%)", value: "—" },
-        { label: "Bulk Specific Gravity (Gmb)", value: "—" }
-      ];
-    }
-
-    // Physical check
-    if (B < A || B <= C) {
-      return [
-        { label: "Bulk Volume (cm³)", value: "Invalid SSD Mass" },
-        { label: "Water Absorption (%)", value: "Invalid SSD Mass" },
-        { label: "Bulk Specific Gravity (Gmb)", value: "Invalid SSD Mass" }
-      ];
-    }
-
-    const volume = B - C;
-    const gmb = A / volume;
-    const waterAbsorptionPct = ((B - A) / volume) * 100;
-
-    return [
-      {
-        label: "Bulk Volume (cm³)",
-        value: volume.toFixed(1)
-      },
-      {
-        label: "Water Absorption (%)",
-        value: waterAbsorptionPct.toFixed(2) + (waterAbsorptionPct > 2.0 ? " (Exceeds 2.0%)" : "")
-      },
-      {
-        label: "Bulk Specific Gravity (Gmb)",
-        value: gmb.toFixed(3)
-      }
-    ];
+class QCLabFramework {
+  constructor(rootContainerId) {
+    this.container = document.getElementById(rootContainerId);
+    this.activeModule = null;
+    this.mode = "interactive"; // "speed" | "interactive" | "learning"
+    this.stepIndex = 0;
+    this.formData = {};
   }
-};
+
+  mountModule(moduleData) {
+    this.activeModule = moduleData;
+    this.formData = this.loadDraftState() || {};
+    this.stepIndex = 0;
+    this.render();
+  }
+
+  setMode(newMode) {
+    if (["speed", "interactive", "learning"].includes(newMode)) {
+      this.mode = newMode;
+      this.render();
+    }
+  }
+
+  setFieldValue(fieldId, value) {
+    this.formData[fieldId] = value;
+    this.saveDraftState();
+    this.updateLiveCalculations();
+  }
+
+  saveDraftState() {
+    if (!this.activeModule) return;
+    try {
+      localStorage.setItem(`qc_draft_${this.activeModule.id}`, JSON.stringify(this.formData));
+    } catch (e) {}
+  }
+
+  loadDraftState() {
+    if (!this.activeModule) return null;
+    try {
+      const saved = localStorage.getItem(`qc_draft_${this.activeModule.id}`);
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) { return null; }
+  }
+
+  render() {
+    if (!this.container || !this.activeModule) return;
+
+    let html = `
+      <!-- Global Mode Selector Shell Bar -->
+      <div class="fw-depth-bar">
+        <button class="fw-mode-btn ${this.mode === 'speed' ? 'active' : ''}" onclick="window.QC.setMode('speed')">Speed Mode</button>
+        <button class="fw-mode-btn ${this.mode === 'interactive' ? 'active' : ''}" onclick="window.QC.setMode('interactive')">Interactive</button>
+        <button class="fw-mode-btn ${this.mode === 'learning' ? 'active' : ''}" onclick="window.QC.setMode('learning')">Expand All (Learning)</button>
+      </div>
+
+      <!-- Module Breadcrumb Header -->
+      <div class="fw-breadcrumbs">
+        Module: <strong>${this.activeModule.parentModule || ''}</strong> &gt; <strong>${this.activeModule.submodule || ''}</strong>
+      </div>
+    `;
+
+    if (this.mode === "speed") {
+      html += this.renderSpeedView();
+    } else if (this.mode === "interactive") {
+      html += this.renderInteractiveView();
+    } else if (this.mode === "learning") {
+      html += this.renderLearningView();
+    }
+
+    html += this.renderResultsBar();
+
+    this.container.innerHTML = html;
+    this.bindInputListeners();
+  }
+
+  renderSpeedView() {
+    return `
+      <div class="fw-card">
+        <h2 class="fw-title" style="margin-bottom: 12px;">Speed Data Entry</h2>
+        <div class="fw-grid">
+          ${(this.activeModule.fields || []).map(field => this.renderInputField(field)).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  renderInteractiveView() {
+    const steps = this.activeModule.steps || [];
+    const step = steps[this.stepIndex] || {};
+    const fields = this.activeModule.fields || [];
+    const stepFields = fields.filter(f => f.stepNum === step.num);
+    const totalSteps = steps.length;
+
+    return `
+      <div class="fw-card">
+        <div class="fw-header-flex">
+          <h2 class="fw-title">Step ${step.num || 1}: ${step.title || ''}</h2>
+          <span class="fw-badge">Step ${this.stepIndex + 1} of ${totalSteps}</span>
+        </div>
+        <p class="fw-desc">${step.description || ''}</p>
+
+        <div class="fw-grid">
+          ${stepFields.map(field => this.renderInputField(field)).join('')}
+        </div>
+
+        <details class="fw-disclosure" open>
+          <summary>Step Guidance</summary>
+          <div class="fw-disclosure-body">
+            <p style="margin:0;">${step.guidance || ''}</p>
+          </div>
+        </details>
+
+        <div class="fw-btn-row">
+          <button class="fw-btn fw-btn-secondary" ${this.stepIndex === 0 ? 'disabled' : ''} onclick="window.QC.prevStep()">&larr; Previous Step</button>
+          <button class="fw-btn fw-btn-primary" ${this.stepIndex === totalSteps - 1 ? 'disabled' : ''} onclick="window.QC.nextStep()">Next Step &rarr;</button>
+        </div>
+      </div>
+    `;
+  }
+
+  renderLearningView() {
+    const steps = this.activeModule.steps || [];
+    const fields = this.activeModule.fields || [];
+
+    return `
+      <div class="fw-card">
+        <h2 class="fw-title" style="margin-bottom: 16px;">Full Procedural Reference (Expanded)</h2>
+        ${steps.map(step => {
+          const stepFields = fields.filter(f => f.stepNum === step.num);
+          return `
+            <div class="fw-learning-block">
+              <h3 class="fw-title" style="font-size: 1rem; margin-bottom: 8px;">Step ${step.num}:${step.title}</h3>
+              <div class="fw-grid">
+                ${stepFields.map(field => this.renderInputField(field)).join('')}
+              </div>
+              <div class="fw-disclosure-body" style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 4px;">
+                <p style="margin: 0 0 4px 0;"><strong>Action Guidance:</strong> ${step.guidance || ''}</p>
+                <p style="margin: 0;"><strong>Technical Principle:</strong> ${step.learning || ''}</p>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  renderInputField(field) {
+    const val = this.formData[field.id] ?? '';
+    return `
+      <div class="fw-input-group">
+        <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
+        <input 
+          data-field-id="${field.id}" 
+          type="${field.type || 'text'}" 
+          placeholder="${field.placeholder || ''}" 
+          value="${val}"
+        >
+      </div>
+    `;
+  }
+
+  renderResultsBar() {
+    const outputs = typeof this.activeModule.compute === 'function' ? this.activeModule.compute(this.formData) : [];
+    return `
+      <div class="fw-results-card">
+        <h3 style="margin: 0 0 12px 0; font-size: 0.95rem; color: #a5d6a7;">Calculated Results</h3>
+        <div class="fw-results-grid">
+          ${outputs.map(out => `
+            <div class="fw-result-item">
+              <span>${out.label}</span>
+              <strong data-res-label="${out.label}">${out.value}</strong>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  bindInputListeners() {
+    this.container.querySelectorAll(".fw-input-group input").forEach(input => {
+      input.addEventListener("input", (e) => {
+        const fieldId = e.target.getAttribute("data-field-id");
+        this.setFieldValue(fieldId, e.target.value);
+      });
+    });
+  }
+
+  updateLiveCalculations() {
+    if (typeof this.activeModule.compute !== 'function') return;
+    const outputs = this.activeModule.compute(this.formData);
+    outputs.forEach(out => {
+      const node = this.container.querySelector(`[data-res-label="${out.label}"]`);
+      if (node) node.textContent = out.value;
+    });
+  }
+
+  nextStep() {
+    if (this.activeModule && this.stepIndex < this.activeModule.steps.length - 1) {
+      this.stepIndex++;
+      this.render();
+    }
+  }
+
+  prevStep() {
+    if (this.stepIndex > 0) {
+      this.stepIndex--;
+      this.render();
+    }
+  }
+}
+
+// Explicit Global Scope Assignment
+window.QCLabFramework = QCLabFramework;
