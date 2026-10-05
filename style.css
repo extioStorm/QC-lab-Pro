@@ -68,6 +68,40 @@ button {
   margin-top: 2px;
 }
 
+/* Sidebar Perspective View Switcher */
+.drawer-toggle-container {
+  display: flex;
+  gap: 4px;
+  margin: 0 4px 12px 4px;
+  background: #181e24;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid #2d3742;
+}
+
+.view-btn {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: 650;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  background: transparent;
+  color: #9ba7b2;
+  transition: all 0.2s ease;
+}
+
+.view-btn:hover {
+  color: #ffffff;
+  background: #28323c;
+}
+
+.view-btn.active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
 .tree {
   display: grid;
   gap: 3px;
