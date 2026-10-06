@@ -241,9 +241,17 @@
     function handleInput(fieldId, value) {
       const numVal = value === '' ? null : parseFloat(value);
       ActiveRecord.data[fieldId] = numVal;
-      processAndRender();
+      
+      // 1. Run engine math in memory
+      processRecord();
+      
+      // 2. Patch calculated fields directly without re-rendering DOM
+      document.querySelectorAll('[data-calc-field-id]').forEach(el => {
+        const key = el.getAttribute('data-calc-field-id');
+        const calculatedVal = ActiveRecord.data[key];
+        el.textContent = (calculatedVal !== null && calculatedVal !== undefined) ? calculatedVal : '--';
+      });
     }
-
 
     function processAndRender() {
       processRecord();
@@ -395,7 +403,7 @@
               <div class="speed-label">${f.label}</div>
               <div class="speed-type">Calculated (${f.unit || 'val'})</div>
             </div>
-            <div class="speed-calc-val">${val !== '' ? val : '--'}</div>
+            <div class="speed-calc-val" data-calc-field-id="${f.id}">${val !== '' ? val : '--'}</div>
           `;
         } else {
           card.innerHTML = `
