@@ -458,7 +458,6 @@ class QCLabFramework {
       : (calculatedData?.results || []);
 
     const stepMath = calculatedData?.stepMath || [];
-    const isComplete = calculatedData?.isComplete !== false;
 
     if (!results.length) {
       return `<p class="fw-empty-state">No calculated values defined for this module.</p>`;
@@ -486,29 +485,15 @@ class QCLabFramework {
     }
 
     if (this.mode === "interactive") {
-      // If the module is already complete, show the current calculation details.
-      // Otherwise the user is still in the measurement phase and should be nudged
-      // to continue. This keeps the step route in control without preventing the
-      // values from being propagated in the background.
-      if (!isComplete) {
-        return `
-          <div class="fw-detached-banner">
-            <p style="margin:0;">Complete the active measurement, then continue to review the calculation.</p>
-          </div>
-        `;
-      }
-
-      const currentMath = stepMath.find(step => step.workflowStep === this.stepIndex + 1) || stepMath[stepMath.length - 1];
+      // Interactive mode is presentation-only. The framework calculates everything
+      // in the background. The current step simply controls which calculation in the
+      // chain is being revealed to the operator. No step blocks calculation.
+      const currentMath = stepMath.find(step => step.workflowStep === this.stepIndex + 1);
 
       if (!currentMath) {
         return `
-          <div class="fw-results-grid">
-            ${results.map(res => `
-              <div class="fw-result-card fw-result-active">
-                <span class="fw-result-label">${res.label}</span>
-                <span class="fw-result-value">${res.value}</span>
-              </div>
-            `).join("")}
+          <div class="fw-detached-banner">
+            <p style="margin:0;">Complete the measurement above, then continue to review the calculation.</p>
           </div>
         `;
       }
@@ -536,6 +521,7 @@ class QCLabFramework {
         </div>
       `;
     }
+
     if (this.mode === "training") {
       const isAttached = this.attachedCalculations.has("ALL_COMPUTED");
 
