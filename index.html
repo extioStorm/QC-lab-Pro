@@ -238,6 +238,13 @@
       ActiveRecord.data[fieldId] = numVal;
     }
 
+    function handleInput(fieldId, value) {
+      const numVal = value === '' ? null : parseFloat(value);
+      ActiveRecord.data[fieldId] = numVal;
+      processAndRender();
+    }
+
+
     function processAndRender() {
       processRecord();
       const viewport = document.getElementById('app-viewport');
@@ -400,7 +407,7 @@
               <input type="number" inputmode="decimal" pattern="[0-9]*" 
                      data-field-id="${f.id}"
                      value="${val}" 
-                     onchange="handleInputSilent('${f.id}', this.value)" />
+                     onchange="handleInput('${f.id}', this.value)" />
             </div>
           `;
         }
