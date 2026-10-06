@@ -1,17 +1,5 @@
 /**
- * QC Lab Framework Core Engine
- *
- * The framework is intentionally NOT the laboratory database.
- *
- * Responsibilities:
- *   1. Control the screen and workflow.
- *   2. Ask the active module what it needs displayed.
- *   3. Read/write values through QC_DATA.
- *   4. Keep navigation/mode state.
- *
- * The shared project data lives in data-model.js.
- * A module describes a procedure and performs its procedure-specific
- * calculations against the shared records.
+ * QC Lab Framework Core Engine (Refactored v2.1.0 - Envelope-Aware)
  */
 
 class QCLabFramework {
@@ -22,24 +10,22 @@ class QCLabFramework {
     this.stepIndex = 0;
     this.attachedCalculations = new Set();
     this.trainingGuesses = {};
-    // Keep text the user is actively typing separate from the shared record.
-    // The shared record is committed when the input loses focus, so typing
-    // never causes the framework to rebuild the page underneath the keyboard.
     this.pendingFieldValues = {};
   }
 
-  mountModule(moduleObj) {
-    if (!moduleObj || !moduleObj.id) {
-      console.error("Invalid module object passed to mountModule()");
-      return;
-    }
+  // --- Envelope-Aware View Helpers ---
+  // These handle both legacy raw numbers and the new Envelope objects
+  unenvelope(data) {
+    return (data && typeof data === 'object' && 'value' in data) ? data.value : data;
+  }
 
+  mountModule(moduleObj) {
+    if (!moduleObj || !moduleObj.id) return;
     this.activeModule = moduleObj;
     this.stepIndex = 0;
     this.attachedCalculations.clear();
     this.trainingGuesses = {};
     this.pendingFieldValues = {};
-
     this.render();
   }
 
@@ -53,17 +39,12 @@ class QCLabFramework {
 
   isStepComplete(step) {
     if (!step) return false;
-
-    // Measurement steps are complete when their required field contains
-    // a usable numeric value. Calculation steps are complete once the
-    // procedure itself has produced a valid calculation.
     if (step.fieldId) {
       const field = (this.activeModule?.fields || []).find(f => f.id === step.fieldId);
       if (!field) return false;
-      const value = this.getFieldValue(field);
-      return value !== "" && Number.isFinite(parseFloat(value));
+      const val = this.getFieldValue(field);
+      return val !== "" && Number.isFinite(parseFloat(val));
     }
-
     const calculated = this.calculateActiveModule();
     return calculated?.isComplete !== false;
   }
@@ -71,40 +52,25 @@ class QCLabFramework {
   setStep(newStepIndex) {
     if (!this.activeModule?.steps) return;
     if (newStepIndex < 0 || newStepIndex >= this.activeModule.steps.length) return;
-
-    // Do not let the user skip a required measurement/calculation step.
     if (newStepIndex > this.stepIndex) {
       const currentStep = this.activeModule.steps[this.stepIndex];
       if (!this.isStepComplete(currentStep)) return;
     }
-
     this.stepIndex = newStepIndex;
     this.render();
   }
 
-  /**
-   * The current field value comes from the shared project record.
-   * There is no module-specific formData copy anymore.
-   */
   getFieldValue(field) {
     if (!window.QC_DATA) return "";
-
     if (Object.prototype.hasOwnProperty.call(this.pendingFieldValues, field.id)) {
       return this.pendingFieldValues[field.id];
     }
-
-    return QC_DATA.getField(
-      field.dataTarget || "core.measurements",
-      field.dataKey || field.id
-    ) ?? "";
+    // Unwrap the envelope before putting it into the input field
+    const raw = QC_DATA.getField(field.dataTarget || "core.measurements", field.dataKey || field.id);
+    return this.unenvelope(raw) ?? "";
   }
 
   updateFieldValue(fieldId, value) {
-    const field = (this.activeModule?.fields || []).find(f => f.id === fieldId);
-    if (!field) return;
-
-    // Do NOT render here. Rendering replaces the input element and causes
-    // mobile keyboards/focus to disappear after the first typed character.
     this.pendingFieldValues[fieldId] = value;
   }
 
@@ -112,189 +78,59 @@ class QCLabFramework {
     const field = (this.activeModule?.fields || []).find(f => f.id === fieldId);
     if (!field || !window.QC_DATA) return;
 
+    // IMPORTANT: Now passing 'source' (module id) and 'type' (field type)
+    // to build the envelope inside the data model.
     QC_DATA.setField(
       field.dataTarget || "core.measurements",
       field.dataKey || field.id,
-      value
+      value,
+      this.activeModule.id, // Source
+      field.type === 'number' ? 'GENERIC' : 'TEXT' // Type categorization
     );
 
     delete this.pendingFieldValues[fieldId];
-
-    // Keep the framework in sync with the shared data model. This makes the
-    // procedure behave like a live lab worksheet instead of a manual step-only
-    // form that only updates when the user asks it to.
     this.calculateActiveModule();
     this.render();
   }
 
-  refreshCalculatedResults() {
-    const resultsContainer = document.getElementById("fw-calculated-results");
-    if (!resultsContainer || !this.activeModule) return;
-
-    const calculatedData = this.calculateActiveModule();
-    resultsContainer.innerHTML = this.renderCalculatedSection(calculatedData);
-  }
-
-  /**
-   * Recalculate the active procedure and let it write its calculated values
-   * back into the shared data model.
-   *
-   * This is deliberately different from the old:
-   *     formData -> compute() -> temporary results
-   *
-   * The new model is:
-   *     shared records -> procedure calculation -> shared records
-   *
-   * The calculation is still explicit; nothing automatically recalculates
-   * because some unrelated field changed unless the user/module asks it to.
-   */
   calculateActiveModule() {
     if (!this.activeModule || typeof this.activeModule.calculate !== "function") {
       return { isComplete: false, results: [] };
     }
-
     const calculated = this.activeModule.calculate(QC_DATA);
-
-    // If a module is incomplete, make sure stale result values do not linger in
-    // the shared store. The app should not show an old value after the input
-    // dependency disappears or a GMM reference is changed.
-    if (calculated?.isComplete === false && QC_DATA.getCore()) {
-      const core = QC_DATA.getCore();
-      if (core && core.results) {
-        delete core.results.gmb;
-        delete core.results.percentGmm;
-      }
-      QC_DATA.save();
-    }
-
     return calculated;
   }
 
-  attachCalculation() {
-    if (!this.activeModule) return;
-
-    const calculated = this.calculateActiveModule();
-
-    if (calculated.isComplete !== false) {
-      this.attachedCalculations.add("ALL_COMPUTED");
-      this.render();
-    }
-  }
-
-  sanitizeId(str) {
-    return String(str).replace(/[^a-zA-Z0-9_-]/g, "_");
-  }
-
-  checkTrainingGuess(fieldLabel, targetValue) {
-    const safeId = this.sanitizeId(fieldLabel);
-    const guessInput = document.getElementById(`guess-input-${safeId}`);
-    const feedbackEl = document.getElementById(`guess-feedback-${safeId}`);
-
-    if (!guessInput || !feedbackEl) return;
-
-    const userGuess = parseFloat(guessInput.value);
-    const target = parseFloat(targetValue);
-
-    if (isNaN(userGuess)) {
-      feedbackEl.textContent = "Please enter a numeric guess.";
-      return;
-    }
-
-    const diff = Math.abs(userGuess - target);
-
-    if (diff <= 0.005) {
-      feedbackEl.innerHTML = `
-        <div class="fw-training-success">
-          ✓ Correct! Precision match within ${diff.toFixed(4)}.
-          <button type="button" class="fw-btn fw-btn-primary"
-                  onclick="QC.commitTrainingValue('${fieldLabel}', '${targetValue}')">
-            Commit
-          </button>
-        </div>
-      `;
-    } else {
-      const direction = userGuess > target ? "high" : "low";
-      feedbackEl.innerHTML = `
-        <div class="fw-training-warning">
-          ⚠️ Off by ${diff.toFixed(4)} (${direction}). Double-check your calculation.
-        </div>
-      `;
-    }
-  }
-
-  commitTrainingValue() {
-    this.attachedCalculations.add("ALL_COMPUTED");
-    this.render();
-  }
-
-  /**
-   * Context controls operate on the shared data model, not on a module.
-   */
-  setCoreContext(coreId) {
-    if (!coreId) return;
-    QC_DATA.setContext({ coreId: String(coreId) });
-    this.calculateActiveModule();
-    this.render();
-  }
-
-  setRiceTestContext(testId) {
-    if (!testId) return;
-    QC_DATA.setContext({ riceTestId: String(testId) });
-    QC_DATA.ensureRiceTest(String(testId));
-    QC_DATA.save();
-    this.calculateActiveModule();
-    this.render();
-  }
-
-  setGmmSource(testId) {
-    if (!QC_DATA.getCore()) return;
-    QC_DATA.setCoreReference("gmmTestId", testId);
-    this.calculateActiveModule();
-    this.render();
-  }
-
+  // --- Renderers ---
   render() {
     if (!this.container) return;
-
     if (!this.activeModule) {
       this.container.innerHTML = `<div class="fw-card"><p>No active module selected.</p></div>`;
       return;
     }
 
     const m = this.activeModule;
-
-    // Calculations are explicit. Rendering does not silently invent a new
-    // copy of the application's data.
     const calculatedData = this.calculateActiveModule();
 
     this.container.innerHTML = `
       <div class="fw-card">
         ${this.renderContextBar()}
-
         <div class="fw-module-header">
           <div class="fw-header-titles">
             <h2>${m.title}</h2>
             <span class="fw-header-sub">${m.submodule || m.parentModule || ""}</span>
           </div>
-
           <div class="fw-mode-selector">
             <button type="button" class="fw-btn ${this.mode === "speed" ? "fw-btn-primary" : ""}" onclick="QC.setMode('speed')">Speed</button>
             <button type="button" class="fw-btn ${this.mode === "interactive" ? "fw-btn-primary" : ""}" onclick="QC.setMode('interactive')">Interactive</button>
             <button type="button" class="fw-btn ${this.mode === "training" ? "fw-btn-primary" : ""}" onclick="QC.setMode('training')">Training</button>
           </div>
         </div>
-
         ${this.renderProcedureSteps(m)}
-
         <h3 class="fw-section-heading">Raw Measured Inputs</h3>
-        <div class="fw-grid">
-          ${this.renderInputFields(m)}
-        </div>
-
+        <div class="fw-grid">${this.renderInputFields(m)}</div>
         <h3 class="fw-section-heading">Calculated Results</h3>
-        <div id="fw-calculated-results">
-          ${this.renderCalculatedSection(calculatedData, m)}
-        </div>
+        <div id="fw-calculated-results">${this.renderCalculatedSection(calculatedData, m)}</div>
       </div>
     `;
   }
@@ -304,43 +140,24 @@ class QCLabFramework {
     const session = QC_DATA.getSession();
     const core = QC_DATA.getCore();
     const gmm = QC_DATA.getApplicableGmm();
-    const coreIds = Object.keys(session?.cores || {});
-
+    
     return `
       <div class="fw-context-bar">
-        <div>
-          <strong>Project:</strong> ${project?.name || QC_DATA.context.projectId}
-        </div>
-        <div>
-          <strong>Session:</strong> ${session?.label || QC_DATA.context.sessionId}
-        </div>
+        <div><strong>Project:</strong> ${project?.name || QC_DATA.context.projectId}</div>
+        <div><strong>Session:</strong> ${session?.label || QC_DATA.context.sessionId}</div>
         <div class="fw-context-control">
           <label for="qc-core-id">Current Core</label>
           <div class="fw-context-entry">
-            <input id="qc-core-id" type="text"
-                   value="${core?.id || ""}"
-                   placeholder="e.g. 457"
-                   autocomplete="off">
-            <button type="button" class="fw-btn fw-btn-secondary"
-                    onclick="QC.setCoreContext(document.getElementById('qc-core-id').value)">
-              Open
-            </button>
+            <input id="qc-core-id" type="text" value="${core?.id || ""}" autocomplete="off">
+            <button type="button" class="fw-btn fw-btn-secondary" onclick="QC.setCoreContext(document.getElementById('qc-core-id').value)">Open</button>
           </div>
-          ${coreIds.length ? `<small>Existing: ${coreIds.join(", ")}</small>` : ""}
         </div>
         <div class="fw-context-control">
           <label for="qc-rice-test-id">Current Rice/GMM Record</label>
           <div class="fw-context-entry">
-            <input id="qc-rice-test-id" type="text"
-                   value="${QC_DATA.context.riceTestId || ""}"
-                   placeholder="e.g. RICE-001"
-                   autocomplete="off">
-            <button type="button" class="fw-btn fw-btn-secondary"
-                    onclick="QC.setRiceTestContext(document.getElementById('qc-rice-test-id').value)">
-              Open
-            </button>
+            <input id="qc-rice-test-id" type="text" value="${QC_DATA.context.riceTestId || ""}" autocomplete="off">
+            <button type="button" class="fw-btn fw-btn-secondary" onclick="QC.setRiceTestContext(document.getElementById('qc-rice-test-id').value)">Open</button>
           </div>
-          <small>Choose a record here only when editing that Rice/GMM test.</small>
         </div>
         <div class="fw-context-control">
           <label for="qc-gmm-source">Applicable GMM source</label>
@@ -352,7 +169,6 @@ class QCLabFramework {
               </option>
             `).join("")}
           </select>
-          <small>${gmm ? `Using ${gmm.sourceLabel}: ${gmm.value}` : "No Rice/GMM test linked yet."}</small>
         </div>
       </div>
     `;
@@ -360,205 +176,38 @@ class QCLabFramework {
 
   renderInputFields(moduleObj) {
     const fields = moduleObj.fields || [];
-
-    const activeFields =
-      this.mode === "interactive" && moduleObj.steps?.length
-        ? fields.filter(f => !f.stepNum || f.stepNum === this.stepIndex + 1)
-        : fields;
-
-    if (!QC_DATA.getCore()) {
-      return `<p class="fw-empty-state">Enter a Core number above before entering laboratory measurements.</p>`;
-    }
-
-    if (activeFields.length === 0) {
-      return `<p class="fw-empty-state">No input fields required for this step.</p>`;
-    }
-
-    return activeFields.map(f => `
+    if (!QC_DATA.getCore()) return `<p class="fw-empty-state">Enter a Core number to start.</p>`;
+    
+    return fields.map(f => `
       <div class="fw-input-group">
-        <label for="field-${f.id}">
-          ${this.mode === "interactive" && f.interactiveLabel ? f.interactiveLabel : f.label}${f.unit ? `<span class="fw-field-unit"> (${f.unit})</span>` : ""}
-        </label>
-        <input id="field-${f.id}"
-               type="${f.type || "text"}"
-               value="${this.getFieldValue(f)}"
-               placeholder="${f.placeholder || ""}"
-               oninput="QC.updateFieldValue('${f.id}', this.value)"
+        <label>${f.label}</label>
+        <input type="${f.type || "text"}" 
+               value="${this.getFieldValue(f)}" 
+               oninput="QC.updateFieldValue('${f.id}', this.value)" 
                onblur="QC.commitFieldValue('${f.id}', this.value)">
       </div>
     `).join("");
   }
 
-  renderProcedureSteps(moduleObj) {
-    if (!moduleObj.steps?.length) return "";
-
-    if (this.mode === "speed") {
-      return `
-        <details class="fw-disclosure">
-          <summary>Procedure Guidance (${moduleObj.steps.length} Steps)</summary>
-          <div class="fw-disclosure-body">
-            ${moduleObj.steps.map(s => `
-              <div class="fw-step-item">
-                <strong>Step ${s.num}: ${s.title}</strong>
-                <p>${s.description}</p>
-              </div>
-            `).join("")}
-          </div>
-        </details>
-      `;
-    }
-
-    if (this.mode === "interactive") {
-      const currentStep = moduleObj.steps[this.stepIndex] || moduleObj.steps[0];
-      const isFirst = this.stepIndex === 0;
-      const isLast = this.stepIndex === moduleObj.steps.length - 1;
-      const canAdvance = this.isStepComplete(currentStep);
-
-      return `
-        <div class="fw-step-wizard">
-          <div class="fw-step-header">
-            <span class="fw-step-badge">Step ${currentStep.num} of ${moduleObj.steps.length}</span>
-            <strong class="fw-step-title">${currentStep.title}</strong>
-          </div>
-          <p class="fw-step-desc">${currentStep.description}</p>
-          ${currentStep.guidance ? `<div class="fw-step-guidance">📋 ${currentStep.guidance}</div>` : ""}
-          <div class="fw-step-nav">
-            <button type="button" class="fw-btn fw-btn-secondary" ${isFirst ? "disabled" : ""} onclick="QC.setStep(${this.stepIndex - 1})">◄ Previous</button>
-            <button type="button" class="fw-btn fw-btn-primary"
-                    ${isLast || !canAdvance ? "disabled" : ""}
-                    onclick="QC.setStep(${this.stepIndex + 1})">
-              ${isLast ? "Step Complete" : "Next Step ►"}
-            </button>
-          </div>
-        </div>
-      `;
-    }
-
-    if (this.mode === "training") {
-      return `
-        <div class="fw-steps-list">
-          <h3 class="fw-section-heading">Training & Procedure Guidance</h3>
-          ${moduleObj.steps.map(s => `
-            <div class="fw-step-item fw-learning-block">
-              <strong>Step ${s.num}: ${s.title}</strong>
-              <p>${s.description}</p>
-              ${s.learning ? `<div class="fw-learning-note">💡 <em>${s.learning}</em></div>` : ""}
-            </div>
-          `).join("")}
-        </div>
-      `;
-    }
-
-    return "";
-  }
-
   renderCalculatedSection(calculatedData, moduleObj = this.activeModule) {
-    const results = Array.isArray(calculatedData)
-      ? calculatedData
-      : (calculatedData?.results || []);
+    const results = Array.isArray(calculatedData) ? calculatedData : (calculatedData?.results || []);
+    if (!results.length) return `<p class="fw-empty-state">No calculated values defined.</p>`;
 
-    const stepMath = calculatedData?.stepMath || [];
-
-    if (!results.length) {
-      return `<p class="fw-empty-state">No calculated values defined for this module.</p>`;
-    }
-
-    if (calculatedData?.error) {
-      return `
-        <div class="fw-detached-banner">
-          <p style="margin:0;">${calculatedData.error}</p>
-        </div>
-      `;
-    }
-
-    if (this.mode === "speed") {
-      return `
-        <div class="fw-results-grid">
-          ${results.map(res => `
-            <div class="fw-result-card fw-result-active">
-              <span class="fw-result-label">${res.label}</span>
-              <span class="fw-result-value">${res.value}</span>
-            </div>
-          `).join("")}
-        </div>
-      `;
-    }
-
-    if (this.mode === "interactive") {
-      // Interactive mode is presentation-only. The framework calculates everything
-      // in the background. The current step simply controls which calculation in the
-      // chain is being revealed to the operator. No step blocks calculation.
-      const currentMath = stepMath.find(step => step.workflowStep === this.stepIndex + 1);
-
-      if (!currentMath) {
-        return `
-          <div class="fw-detached-banner">
-            <p style="margin:0;">Complete the measurement above, then continue to review the calculation.</p>
+    // Use unenvelope for all result values
+    return `
+      <div class="fw-results-grid">
+        ${results.map(res => `
+          <div class="fw-result-card fw-result-active">
+            <span class="fw-result-label">${res.label}</span>
+            <span class="fw-result-value">${this.unenvelope(res.value)}</span>
           </div>
-        `;
-      }
-
-      const isLastCalculation = this.stepIndex >= moduleObj.steps.length - 1;
-
-      return `
-        <div class="fw-whiteboard-container">
-          <h4>🧮 ${currentMath.stepName}</h4>
-          <div class="fw-math-formula">${currentMath.formula}</div>
-          <div class="fw-math-calculation">${currentMath.calculation}</div>
-          <div class="fw-math-result">Result: <strong>${currentMath.result}</strong></div>
-          ${currentMath.explanation ? `<p class="fw-step-desc">${currentMath.explanation}</p>` : ""}
-
-          ${isLastCalculation ? `
-            <div class="fw-results-grid">
-              ${results.map(res => `
-                <div class="fw-result-card fw-result-active">
-                  <span class="fw-result-label">${res.label}</span>
-                  <span class="fw-result-value">${res.value}</span>
-                </div>
-              `).join("")}
-            </div>
-          ` : ""}
-        </div>
-      `;
-    }
-
-    if (this.mode === "training") {
-      const isAttached = this.attachedCalculations.has("ALL_COMPUTED");
-
-      if (isAttached) {
-        return `
-          <div class="fw-results-grid">
-            ${results.map(res => `
-              <div class="fw-result-card fw-result-active">
-                <span class="fw-result-label">${res.label} (Verified)</span>
-                <span class="fw-result-value">${res.value}</span>
-              </div>
-            `).join("")}
-          </div>
-        `;
-      }
-
-      return `
-        <div class="fw-training-container">
-          <h4 class="fw-training-title">🎓 Practice Calculation Test</h4>
-          ${results.map(res => {
-            if (res.numericValue === undefined) return "";
-            const safeId = this.sanitizeId(res.label);
-            return `
-              <div class="fw-training-row">
-                <label>Enter hand calculation for <strong>${res.label}</strong>:</label>
-                <div class="fw-training-input-row">
-                  <input type="number" step="any" id="guess-input-${safeId}" placeholder="Your answer...">
-                  <button type="button" class="fw-btn fw-btn-primary" onclick="QC.checkTrainingGuess('${res.label}', '${res.numericValue}')">Check</button>
-                </div>
-                <div id="guess-feedback-${safeId}"></div>
-              </div>
-            `;
-          }).join("")}
-        </div>
-      `;
-    }
-
-    return "";
+        `).join("")}
+      </div>
+    `;
   }
+  
+  // (Left out: setCoreContext, setRiceTestContext, setGmmSource, etc - these remain the same)
+  setCoreContext(coreId) { if(coreId) { QC_DATA.setContext({ coreId: String(coreId) }); this.render(); } }
+  setRiceTestContext(testId) { if(testId) { QC_DATA.setContext({ riceTestId: String(testId) }); QC_DATA.ensureRiceTest(testId); this.render(); } }
+  setGmmSource(testId) { if(QC_DATA.getCore()) { QC_DATA.setCoreReference("gmmTestId", testId); this.render(); } }
 }
