@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Asphalt QC Field System</title>
+  <style>
+    :root {
+      --bg: #0f1115; --panel: #181b20; --panel-border: #2a2e37;
+      --text: #f0f3f6; --muted: #8b949e; --accent: #3182ce;
+      --accent-tap: #2b6cb0; --success: #2e8540; --warning: #d69e2e;
+      --input-bg: #090a0c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; overflow-x: hidden; }
+    
+    /* Header & Mobile Module Bar */
+    header { background: var(--panel); border-bottom: 1px solid var(--panel-border); padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.75rem; sticky: top; top: 0; z-index: 100; }
+    .top-bar { display: flex; align-items: center; justify-content: space-between; }
+    .logo { font-weight: 800; font-size: 1rem; letter-spacing: 0.5px; color: var(--accent); }
+    
+    .module-select-wrapper { width: 100%; }
+    select.mobile-nav { width: 100%; height: 48px; background: var(--input-bg); color: var(--text); border: 1px solid var(--panel-border); border-radius: 8px; padding: 0 0.75rem; font-size: 1rem; font-weight: 600; outline: none; }
+
+    /* Sticky Mode Switcher Toolbar */
+    .toolbar { background: var(--panel); border-bottom: 1px solid var(--panel-border); padding: 0.5rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    .project-meta { display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: var(--muted); }
+    .project-meta input { background: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text); padding: 0.4rem 0.6rem; border-radius: 6px; font-weight: 700; width: 120px; font-size: 0.95rem; text-align: right; }
+    
+    .mode-selector { display: flex; width: 100%; background: var(--input-bg); padding: 3px; border-radius: 8px; border: 1px solid var(--panel-border); height: 44px; }
+    .mode-btn { flex: 1; background: transparent; border: none; color: var(--muted); border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+    .mode-btn.active { background: var(--accent); color: white; }
+    
+    /* Mobile Main Viewport */
+    main { flex: 1; padding: 1rem; display: flex; justify-content: center; }
+    .container { width: 100%; max-width: 600px; }
+    
+    /* Touch-Optimized Component Cards */
+    .card { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--text); }
+    .instruction { color: var(--muted); font-size: 0.95rem; margin-bottom: 1.25rem; line-height: 1.4; }
+    
+    /* Giant Touch Targets for Mobile Inputs */
+    .field-group { margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    label { font-size: 0.9rem; color: var(--muted); font-weight: 600; }
+    input[type="number"], input[type="text"] { background: var(--input-bg); border: 1.5px solid var(--panel-border); color: var(--text); height: 52px; padding: 0 0.85rem; border-radius: 8px; font-size: 1.1rem; font-weight: 600; width: 100%; }
+    input:focus { outline: none; border-color: var(--accent); background: #000; }
+    
+    .formula-box { background: #0d1117; border-left: 4px solid var(--accent); padding: 0.85rem 1rem; border-radius: 0 8px 8px 0; font-family: monospace; font-size: 0.95rem; margin-bottom: 1.25rem; color: #9ecbff; }
+    
+    /* Big Bold Display Cards */
+    .value-display { background: #0d1117; border: 1px solid var(--panel-border); padding: 1.25rem; border-radius: 10px; text-align: center; margin-bottom: 1.25rem; }
+    .value-display .val { font-size: 2.2rem; font-weight: 800; color: var(--success); }
+    .value-display .unit { font-size: 1rem; color: var(--muted); margin-left: 0.3rem; font-weight: 500; }
+    
+    .fallback-banner { background: rgba(214, 158, 46, 0.12); border: 1px solid var(--warning); padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.9rem; color: #f6ad55; line-height: 1.4; }
+
+    /* Touch Button State */
+    .btn-primary { background: var(--accent); color: white; border: none; height: 52px; border-radius: 8px; font-weight: 700; cursor: pointer; width: 100%; font-size: 1.05rem; letter-spacing: 0.3px; display: flex; align-items: center; justify-content: center; }
+    .btn-primary:active { background: var(--accent-tap); transform: scale(0.99); }
+
+    /* Speed Mode Mobile Field Cards */
+    .speed-card { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 10px; padding: 1rem; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .speed-info { flex: 1; }
+    .speed-label { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+    .speed-type { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; margin-top: 0.2rem; }
+    .speed-input-wrap { width: 130px; }
+    .speed-input-wrap input { height: 44px; font-size: 1rem; text-align: right; }
+    .speed-calc-val { font-size: 1.2rem; font-weight: 800; color: var(--success); text-align: right; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="top-bar">
+      <div class="logo">QC FIELD ENGINE</div>
+      <div style="font-size: 0.75rem; color: var(--muted); background: var(--input-bg); padding: 0.2rem 0.5rem; border-radius: 4px;">OFFLINE READY</div>
+    </div>
+    <div class="module-select-wrapper">
+      <select id="mobile-module-select" class="mobile-nav" onchange="selectModule(this.value)"></select>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="project-meta">
+      <span>ACTIVE JOB #:</span>
+      <input type="text" id="project-id-input" value="JOB-2173" oninput="updateProjectId(this.value)" />
+    </div>
+    
+    <div class="mode-selector">
+      <button class="mode-btn active" onclick="setMode('INTERACTIVE')">Step Wizard</button>
+      <button class="mode-btn" onclick="setMode('SPEED')">Speed Sheet</button>
+      <button class="mode-btn" onclick="setMode('TRAINING')">Training</button>
+    </div>
+  </div>
+
+  <main>
+    <div class="container" id="app-viewport"></div>
+  </main>
+
+  <script>
+    // =========================================================================
+    // 1. GLOBAL REGISTRY & RECORD STORE
+    // =========================================================================
+    const ModuleRegistry = new Map();
+    let activeModule = null;
+    let currentMode = 'INTERACTIVE';
+    let currentStepIndex = 0;
+
+    const ActiveRecord = {
+      id: "CORE-001",
+      projectId: "JOB-2173",
+      timestamp: new Date().toISOString(),
+      data: {
+        manualRiceGmm: 2.510
+      }
+    };
+
+    function updateProjectId(val) {
+      ActiveRecord.projectId = val;
+      processAndRender();
+    }
+
+    function registerModule(moduleObj) {
+      ModuleRegistry.set(moduleObj.meta.id, moduleObj);
+      renderNavigation();
+      if (!activeModule) selectModule(moduleObj.meta.id);
+    }
+
+    function renderNavigation() {
+      const select = document.getElementById('mobile-module-select');
+      select.innerHTML = '';
+      ModuleRegistry.forEach((mod) => {
+        const opt = document.createElement('option');
+        opt.value = mod.meta.id;
+        opt.textContent = mod.meta.title;
+        if (activeModule && activeModule.meta.id === mod.meta.id) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    function selectModule(id) {
+      activeModule = ModuleRegistry.get(id);
+      currentStepIndex = 0;
+      renderNavigation();
+      processAndRender();
+    }
+
+    function setMode(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.toUpperCase().includes(mode.substring(0, 4)));
+      });
+      processAndRender();
+    }
+
+    // =========================================================================
+    // 2. PROCESSING ENGINE (Primitives, AASHTO Rounding, Propagation)
+    // =========================================================================
+    const EngineOps = {
+      ADD: (a, b) => a + b,
+      SUBTRACT: (a, b) => a - b,
+      MULTIPLY: (a, b) => a * b,
+      DIVIDE: (a, b) => (b === 0 || b === null ? null : a / b),
+      ROUND_AASHTO: (val, decimals) => {
+        if (val === null || isNaN(val)) return null;
+        const factor = Math.pow(10, decimals);
+        return Math.round((val + Number.EPSILON) * factor) / factor;
+      }
+    };
+
+    function processRecord() {
+      if (!activeModule || !activeModule.calculations) return;
+
+      let evaluatedAny = false;
+      do {
+        evaluatedAny = false;
+        activeModule.calculations.forEach(calc => {
+          const inputVals = calc.inputs.map(k => {
+            if (k === 'targetRiceGmm') {
+              return ActiveRecord.data.targetRiceGmm ?? ActiveRecord.data.manualRiceGmm ?? null;
+            }
+            return ActiveRecord.data[k] ?? null;
+          });
+
+          const hasAllInputs = inputVals.every(v => v !== null && !isNaN(v));
+
+          if (hasAllInputs) {
+            const rawResult = EngineOps[calc.op](...inputVals);
+            const roundedResult = EngineOps.ROUND_AASHTO(rawResult, calc.precision);
+
+            if (ActiveRecord.data[calc.outputKey] !== roundedResult) {
+              ActiveRecord.data[calc.outputKey] = roundedResult;
+              evaluatedAny = true;
+            }
+          }
+        });
+      } while (evaluatedAny);
+    }
+
+    function handleInput(fieldId, value) {
+      const numVal = value === '' ? null : parseFloat(value);
+      ActiveRecord.data[fieldId] = numVal;
+      processAndRender();
+    }
+
+    function processAndRender() {
+      processRecord();
+      const viewport = document.getElementById('app-viewport');
+      viewport.innerHTML = '';
+
+      if (currentMode === 'INTERACTIVE') renderInteractiveMode(viewport);
+      else if (currentMode === 'SPEED') renderSpeedMode(viewport);
+      else if (currentMode === 'TRAINING') renderTrainingMode(viewport);
+    }
+
+    // =========================================================================
+    // 3. RENDERER ENGINE (Mobile Visual Components)
+    // =========================================================================
+    function renderInteractiveMode(container) {
+      const step = activeModule.steps[currentStepIndex];
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      const title = document.createElement('div');
+      title.className = 'card-title';
+      title.textContent = `Step ${currentStepIndex + 1} of ${activeModule.steps.length}: ${step.title}`;
+      card.appendChild(title);
+
+      step.components.forEach(comp => {
+        switch (comp.type) {
+          case 'instruction':
+            const inst = document.createElement('div');
+            inst.className = 'instruction';
+            inst.textContent = comp.text;
+            card.appendChild(inst);
+            break;
+
+          case 'field-input':
+            const group = document.createElement('div');
+            group.className = 'field-group';
+            group.innerHTML = `<label>${comp.label}</label>`;
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.inputMode = 'decimal'; // Triggers mobile numeric keypads
+            input.pattern = '[0-9]*';
+            input.step = '0.1';
+            input.value = ActiveRecord.data[comp.fieldId] ?? '';
+            input.oninput = (e) => handleInput(comp.fieldId, e.target.value);
+            group.appendChild(input);
+            card.appendChild(group);
+            break;
+
+          case 'fallback-rice-input':
+            if (!ActiveRecord.data.targetRiceGmm) {
+              const fBox = document.createElement('div');
+              fBox.className = 'fallback-banner';
+              fBox.innerHTML = `
+                ⚠️ <strong>No linked Rice ($G_{mm}$) module found for ${ActiveRecord.projectId}.</strong><br/>
+                Enter manual target Rice ($G_{mm}$) value below for compaction % calculation:
+                <input type="number" inputmode="decimal" pattern="[0-9]*" step="0.001" style="margin-top:0.5rem;" value="${ActiveRecord.data.manualRiceGmm ?? ''}" oninput="handleInput('manualRiceGmm', this.value)" />
+              `;
+              card.appendChild(fBox);
+            }
+            break;
+
+          case 'formula':
+            const fBox = document.createElement('div');
+            fBox.className = 'formula-box';
+            fBox.textContent = comp.expression;
+            card.appendChild(fBox);
+            break;
+
+          case 'value-display':
+            const vBox = document.createElement('div');
+            vBox.className = 'value-display';
+            const val = ActiveRecord.data[comp.fieldId] ?? '--';
+            vBox.innerHTML = `<div class="val">${val}<span class="unit">${comp.unit}</span></div>`;
+            card.appendChild(vBox);
+            break;
+
+          case 'action-button':
+            const btn = document.createElement('button');
+            btn.className = 'btn-primary';
+            btn.textContent = comp.label;
+            btn.onclick = () => {
+              if (currentStepIndex < activeModule.steps.length - 1) {
+                currentStepIndex++;
+                processAndRender();
+              }
+            };
+            card.appendChild(btn);
+            break;
+        }
+      });
+
+      container.appendChild(card);
+    }
+
+    function renderSpeedMode(container) {
+      const header = document.createElement('div');
+      header.className = 'card-title';
+      header.style.marginBottom = '0.75rem';
+      header.textContent = `Speed Mode Field Card (${ActiveRecord.projectId})`;
+      container.appendChild(header);
+
+      activeModule.fields.forEach(f => {
+        const card = document.createElement('div');
+        card.className = 'speed-card';
+        let val = ActiveRecord.data[f.id] ?? '';
+        
+        if (f.id === 'targetRiceGmm' && !val) {
+          val = ActiveRecord.data.manualRiceGmm ?? '';
+        }
+
+        if (f.computed) {
+          card.innerHTML = `
+            <div class="speed-info">
+              <div class="speed-label">${f.label}</div>
+              <div class="speed-type">Calculated (${f.unit || 'val'})</div>
+            </div>
+            <div class="speed-calc-val">${val !== '' ? val : '--'}</div>
+          `;
+        } else {
+          card.innerHTML = `
+            <div class="speed-info">
+              <div class="speed-label">${f.label}</div>
+              <div class="speed-type">Input (${f.unit || 'val'})</div>
+            </div>
+            <div class="speed-input-wrap">
+              <input type="number" inputmode="decimal" pattern="[0-9]*" value="${val}" oninput="handleInput('${f.id}', this.value)" />
+            </div>
+          `;
+        }
+        container.appendChild(card);
+      });
+    }
+
+    function renderTrainingMode(container) {
+      renderInteractiveMode(container);
+      
+      const step = activeModule.steps[currentStepIndex];
+      if (step.trainingText) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.borderColor = 'var(--accent)';
+        card.innerHTML = `
+          <div class="card-title" style="color: var(--accent)">AASHTO Spec & Training Context</div>
+          <div class="instruction">${step.trainingText}</div>
+        `;
+        container.appendChild(card);
+      }
+    }
+  </script>
+
+  <!-- Load Registered Modules -->
+  <script src="modules/gmb-density.js"></script>
+</body>
+</html>
