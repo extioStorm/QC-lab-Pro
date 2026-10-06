@@ -6,17 +6,18 @@
  * Modules do not own their own copy of laboratory data.
  * They read/write the current project's records.
  *
- * Conceptual shape:
+ * The architecture has evolved to support the actual asphalt workflow:
  *
- * Project
- *   -> Test Session / Day
- *       -> Cores
- *       -> Rice / GMM Tests
- *       -> other test components
+ *   Project
+ *     -> Mix Design(s)
+ *     -> Lab Test(s)
+ *        -> Subtests (Rice, Gauge, Ignition, etc.)
+ *     -> Sessions
+ *        -> Cores
  *
- * A core can reference a Rice/GMM test without making that test a child
- * of the core. Physical information such as cooler placement is a property
- * of the core, not what determines its logical test dependencies.
+ * A Core is not the owner of the entire testing workflow. It may reference a
+ * lab test and/or a mix design, and if there is no linked data it can be
+ * explicitly overridden manually with an optional source note.
  */
 
 class QCDataStore {
@@ -29,6 +30,8 @@ class QCDataStore {
         "PROJECT-1": {
           id: "PROJECT-1",
           name: "New Project",
+          mixDesigns: {},
+          labTests: {},
           sessions: {
             "DAY-1": {
               id: "DAY-1",
@@ -46,7 +49,9 @@ class QCDataStore {
       projectId: "PROJECT-1",
       sessionId: "DAY-1",
       coreId: null,
-      riceTestId: null
+      riceTestId: null,
+      labTestId: null,
+      mixDesignId: null
     };
   }
 
@@ -75,8 +80,8 @@ class QCDataStore {
     localStorage.setItem(this.contextKey, JSON.stringify(this.context));
   }
 
-  getProject() {
-    return this.data.projects[this.context.projectId] || null;
+  getProject(projectId = this.context.projectId) {
+    return this.data.projects[projectId] || null;
   }
 
   getSession() {
@@ -98,6 +103,94 @@ class QCDataStore {
     const tests = this.getRiceTests();
     if (!this.context.riceTestId) return null;
     return tests[this.context.riceTestId] || null;
+  }
+
+  getMixDesigns() {
+    return this.getProject()?.mixDesigns || {};
+  }
+
+  getMixDesign(mixDesignId = this.context.mixDesignId) {
+    if (!mixDesignId) return null;
+    return this.getMixDesigns()[mixDesignId] || null;
+  }
+
+  getLabTests() {
+    return this.getProject()?.labTests || {};
+  }
+
+  getLabTest(labTestId = this.context.labTestId) {
+    if (!labTestId) return null;
+    return this.getLabTests()[labTestId] || null;
+  }
+
+  ensureProject(projectId) {
+    if (!projectId) return null;
+    if (!this.data.projects[projectId]) {
+      this.data.projects[projectId] = {
+        id: String(projectId),
+        name: String(projectId),
+        mixDesigns: {},
+        labTests: {},
+        sessions: {}
+      };
+    }
+    return this.data.projects[projectId];
+  }
+
+  ensureMixDesign(mixDesignId, label = "Mix Design") {
+    const project = this.getProject();
+    if (!project || !mixDesignId) return null;
+
+    if (!project.mixDesigns[mixDesignId]) {
+      project.mixDesigns[mixDesignId] = {
+        id: String(mixDesignId),
+        label: String(label),
+        values: {},
+        notes: "",
+        createdAt: new Date().toISOString()
+      };
+    }
+
+    return project.mixDesigns[mixDesignId];
+  }
+
+  ensureLabTest(labTestId, label = "Lab Test") {
+    const project = this.getProject();
+    if (!project || !labTestId) return null;
+
+    if (!project.labTests[labTestId]) {
+      project.labTests[labTestId] = {
+        id: String(labTestId),
+        label: String(label),
+        projectId: project.id,
+        mixDesignId: this.context.mixDesignId || null,
+        sample: {},
+        subtests: {},
+        calculations: {},
+        results: {},
+        createdAt: new Date().toISOString()
+      };
+    }
+
+    return project.labTests[labTestId];
+  }
+
+  ensureLabSubtest(labTestId, subtestId, subtestType = "generic") {
+    const labTest = this.getLabTest(labTestId);
+    if (!labTest || !subtestId) return null;
+
+    if (!labTest.subtests[subtestId]) {
+      labTest.subtests[subtestId] = {
+        id: String(subtestId),
+        type: String(subtestType),
+        values: {},
+        calculations: {},
+        results: {},
+        manualOverrides: {}
+      };
+    }
+
+    return labTest.subtests[subtestId];
   }
 
   ensureRiceTest(testId) {
@@ -127,8 +220,11 @@ class QCDataStore {
         calculations: {},
         results: {},
         references: {
-          gmmTestId: null
-        }
+          gmmTestId: null,
+          labTestId: null,
+          mixDesignId: null
+        },
+        manualValues: {}
       };
     }
 
@@ -145,6 +241,14 @@ class QCDataStore {
       this.ensureCore(this.context.coreId);
     }
 
+    if (this.context.mixDesignId) {
+      this.ensureMixDesign(this.context.mixDesignId);
+    }
+
+    if (this.context.labTestId) {
+      this.ensureLabTest(this.context.labTestId);
+    }
+
     this.save();
   }
 
@@ -153,6 +257,8 @@ class QCDataStore {
     if (target === "core.calculations") return this.getCore()?.calculations?.[key];
     if (target === "core.results") return this.getCore()?.results?.[key];
     if (target === "riceTest") return this.getRiceTest()?.[key];
+    if (target === "labTest") return this.getLabTest()?.[key];
+    if (target === "mixDesign") return this.getMixDesign()?.values?.[key] ?? this.getMixDesign()?.[key];
 
     return undefined;
   }
@@ -164,6 +270,23 @@ class QCDataStore {
       const test = this.getRiceTest();
       if (!test) return;
       test[key] = value;
+      this.save();
+      return;
+    }
+
+    if (target === "labTest") {
+      const test = this.getLabTest();
+      if (!test) return;
+      test[key] = value;
+      this.save();
+      return;
+    }
+
+    if (target === "mixDesign") {
+      const mix = this.getMixDesign();
+      if (!mix) return;
+      if (!mix.values) mix.values = {};
+      mix.values[key] = value;
       this.save();
       return;
     }
@@ -180,6 +303,53 @@ class QCDataStore {
     }
 
     this.save();
+  }
+
+  /**
+   * A value may come from a linked Lab Test or a Mix Design. If neither is present,
+   * the user may still manually enter a value and optionally attach a source label.
+   */
+  setManualValue(targetKey, value, source = null) {
+    const core = this.getCore();
+    if (!core) return;
+
+    core.manualValues = core.manualValues || {};
+    core.manualValues[targetKey] = {
+      value,
+      source: source || "manual entry",
+      manual: true
+    };
+
+    this.save();
+  }
+
+  getManualValue(targetKey) {
+    return this.getCore()?.manualValues?.[targetKey] || null;
+  }
+
+  /**
+   * Explicit dependency resolution: do not silently fall back to the mix design.
+   * The user must decide the source for the missing prerequisite.
+   */
+  getValueResolutionOptions(targetKey, existingValue = null) {
+    const labTest = this.getLabTest();
+    const mixDesign = this.getMixDesign();
+    const core = this.getCore();
+
+    return {
+      targetKey,
+      existingValue,
+      hasLabTest: !!labTest,
+      hasMixDesign: !!mixDesign,
+      hasCore: !!core,
+      options: [
+        "link_existing_lab_test",
+        "create_new_lab_test",
+        "use_mix_design_value",
+        "manual_entry",
+        "manual_entry_with_source"
+      ]
+    };
   }
 
   /**
@@ -211,3 +381,18 @@ class QCDataStore {
 }
 
 window.QC_DATA = new QCDataStore();
+
+/**
+ * Compatibility helpers for future modules.
+ * These are intentionally lightweight so existing modules do not need to know
+ * about the larger project/lab design structure.
+ */
+window.QC_DATA.ensureProject = window.QC_DATA.ensureProject.bind(window.QC_DATA);
+window.QC_DATA.ensureMixDesign = window.QC_DATA.ensureMixDesign.bind(window.QC_DATA);
+window.QC_DATA.ensureLabTest = window.QC_DATA.ensureLabTest.bind(window.QC_DATA);
+window.QC_DATA.ensureLabSubtest = window.QC_DATA.ensureLabSubtest.bind(window.QC_DATA);
+window.QC_DATA.getMixDesigns = window.QC_DATA.getMixDesigns.bind(window.QC_DATA);
+window.QC_DATA.getLabTests = window.QC_DATA.getLabTests.bind(window.QC_DATA);
+window.QC_DATA.getValueResolutionOptions = window.QC_DATA.getValueResolutionOptions.bind(window.QC_DATA);
+window.QC_DATA.setManualValue = window.QC_DATA.setManualValue.bind(window.QC_DATA);
+window.QC_DATA.getManualValue = window.QC_DATA.getManualValue.bind(window.QC_DATA);
