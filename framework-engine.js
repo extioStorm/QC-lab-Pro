@@ -119,7 +119,12 @@ class QCLabFramework {
     );
 
     delete this.pendingFieldValues[fieldId];
-    this.refreshCalculatedResults();
+
+    // Keep the framework in sync with the shared data model. This makes the
+    // procedure behave like a live lab worksheet instead of a manual step-only
+    // form that only updates when the user asks it to.
+    this.calculateActiveModule();
+    this.render();
   }
 
   refreshCalculatedResults() {
@@ -148,7 +153,21 @@ class QCLabFramework {
       return { isComplete: false, results: [] };
     }
 
-    return this.activeModule.calculate(QC_DATA);
+    const calculated = this.activeModule.calculate(QC_DATA);
+
+    // If a module is incomplete, make sure stale result values do not linger in
+    // the shared store. The app should not show an old value after the input
+    // dependency disappears or a GMM reference is changed.
+    if (calculated?.isComplete === false && QC_DATA.getCore()) {
+      const core = QC_DATA.getCore();
+      if (core && core.results) {
+        delete core.results.gmb;
+        delete core.results.percentGmm;
+      }
+      QC_DATA.save();
+    }
+
+    return calculated;
   }
 
   attachCalculation() {
@@ -214,6 +233,7 @@ class QCLabFramework {
   setCoreContext(coreId) {
     if (!coreId) return;
     QC_DATA.setContext({ coreId: String(coreId) });
+    this.calculateActiveModule();
     this.render();
   }
 
@@ -222,12 +242,14 @@ class QCLabFramework {
     QC_DATA.setContext({ riceTestId: String(testId) });
     QC_DATA.ensureRiceTest(String(testId));
     QC_DATA.save();
+    this.calculateActiveModule();
     this.render();
   }
 
   setGmmSource(testId) {
     if (!QC_DATA.getCore()) return;
     QC_DATA.setCoreReference("gmmTestId", testId);
+    this.calculateActiveModule();
     this.render();
   }
 
@@ -464,35 +486,34 @@ class QCLabFramework {
     }
 
     if (this.mode === "interactive") {
-      // Show exactly one calculation at a time. The procedure has already
-      // propagated the values through QC_DATA; this UI exposes that chain.
-      if (this.stepIndex < 3) {
-        return `
-          <div class="fw-detached-banner">
-            <p style="margin:0;">Complete the measurement above, then continue to review the calculation.</p>
-          </div>
-        `;
-      }
-
+      // If the module is already complete, show the current calculation details.
+      // Otherwise the user is still in the measurement phase and should be nudged
+      // to continue. This keeps the step route in control without preventing the
+      // values from being propagated in the background.
       if (!isComplete) {
         return `
           <div class="fw-detached-banner">
-            <p style="margin:0;">Complete all three measurements before reviewing the calculation steps.</p>
+            <p style="margin:0;">Complete the active measurement, then continue to review the calculation.</p>
           </div>
         `;
       }
 
-      const currentMath = stepMath.find(step => step.workflowStep === this.stepIndex + 1);
+      const currentMath = stepMath.find(step => step.workflowStep === this.stepIndex + 1) || stepMath[stepMath.length - 1];
 
       if (!currentMath) {
         return `
-          <div class="fw-detached-banner">
-            <p style="margin:0;">This step does not have a calculation to display yet.</p>
+          <div class="fw-results-grid">
+            ${results.map(res => `
+              <div class="fw-result-card fw-result-active">
+                <span class="fw-result-label">${res.label}</span>
+                <span class="fw-result-value">${res.value}</span>
+              </div>
+            `).join("")}
           </div>
         `;
       }
 
-      const isLastCalculation = this.stepIndex === moduleObj.steps.length - 1;
+      const isLastCalculation = this.stepIndex >= moduleObj.steps.length - 1;
 
       return `
         <div class="fw-whiteboard-container">
