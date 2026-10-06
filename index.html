@@ -55,9 +55,15 @@
     
     .fallback-banner { background: rgba(214, 158, 46, 0.12); border: 1px solid var(--warning); padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.9rem; color: #f6ad55; line-height: 1.4; }
 
-    /* Touch Button State */
-    .btn-primary { background: var(--accent); color: white; border: none; height: 52px; border-radius: 8px; font-weight: 700; cursor: pointer; width: 100%; font-size: 1.05rem; letter-spacing: 0.3px; display: flex; align-items: center; justify-content: center; }
+    /* Navigation Action Buttons */
+    .wizard-nav { display: flex; gap: 0.75rem; margin-top: 1rem; }
+    .btn-primary, .btn-secondary, .btn-action { height: 52px; border-radius: 8px; font-weight: 700; cursor: pointer; flex: 1; font-size: 1rem; display: flex; align-items: center; justify-content: center; }
+    .btn-primary { background: var(--accent); color: white; border: none; }
     .btn-primary:active { background: var(--accent-tap); transform: scale(0.99); }
+    .btn-secondary { background: transparent; color: var(--muted); border: 1px solid var(--panel-border); }
+    .btn-secondary:active { background: var(--input-bg); }
+    .btn-action { background: var(--input-bg); color: var(--accent); border: 1px solid var(--accent); margin-bottom: 1.25rem; }
+    .btn-action:active { background: var(--accent); color: white; }
 
     /* Speed Mode Mobile Field Cards */
     .speed-card { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 10px; padding: 1rem; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
@@ -146,10 +152,21 @@
     }
 
     function selectModule(id) {
+      if (!ModuleRegistry.has(id)) {
+        alert(`Module ${id} is not registered yet.`);
+        return;
+      }
       activeModule = ModuleRegistry.get(id);
       currentStepIndex = 0;
       renderNavigation();
       processAndRender();
+    }
+
+    function goToStep(index) {
+      if (index >= 0 && index < activeModule.steps.length) {
+        currentStepIndex = index;
+        processAndRender();
+      }
     }
 
     function setMode(mode) {
@@ -221,7 +238,7 @@
     }
 
     // =========================================================================
-    // 3. RENDERER ENGINE (Mobile Visual Components)
+    // 3. RENDERER ENGINE (Mobile Visual & Action Components)
     // =========================================================================
     function renderInteractiveMode(container) {
       const step = activeModule.steps[currentStepIndex];
@@ -252,7 +269,6 @@
             input.pattern = '[0-9]*';
             input.step = '0.1';
             input.value = ActiveRecord.data[comp.fieldId] ?? '';
-            // Process math only when leaving input focus
             input.onchange = (e) => handleInput(comp.fieldId, e.target.value);
             group.appendChild(input);
             card.appendChild(group);
@@ -287,20 +303,49 @@
             break;
 
           case 'action-button':
-            const btn = document.createElement('button');
-            btn.className = 'btn-primary';
-            btn.textContent = comp.label;
-            btn.onclick = () => {
-              if (currentStepIndex < activeModule.steps.length - 1) {
-                currentStepIndex++;
-                processAndRender();
+            const actBtn = document.createElement('button');
+            actBtn.className = 'btn-action';
+            actBtn.textContent = comp.label;
+            actBtn.onclick = () => {
+              if (comp.action === 'JUMP_MODULE') {
+                selectModule(comp.targetModuleId);
+              } else if (comp.action === 'JUMP_STEP') {
+                goToStep(comp.targetStepIndex);
               }
             };
-            card.appendChild(btn);
+            card.appendChild(actBtn);
             break;
         }
       });
 
+      // Default Linear Wizard Navigation
+      const nav = document.createElement('div');
+      nav.className = 'wizard-nav';
+
+      if (currentStepIndex > 0) {
+        const prevBtn = document.createElement('button');
+        prevBtn.className = 'btn-secondary';
+        prevBtn.textContent = '← Back';
+        prevBtn.onclick = () => goToStep(currentStepIndex - 1);
+        nav.appendChild(prevBtn);
+      }
+
+      if (currentStepIndex < activeModule.steps.length - 1) {
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'btn-primary';
+        nextBtn.textContent = 'Next Step →';
+        nextBtn.onclick = () => goToStep(currentStepIndex + 1);
+        nav.appendChild(nextBtn);
+      } else {
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'btn-primary';
+        resetBtn.style.background = 'var(--success)';
+        resetBtn.textContent = '✓ Done (Start Over)';
+        resetBtn.onclick = () => goToStep(0);
+        nav.appendChild(resetBtn);
+      }
+
+      card.appendChild(nav);
       container.appendChild(card);
     }
 
