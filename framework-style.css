@@ -511,3 +511,84 @@ body {
 .fw-context-entry .fw-btn {
   flex-shrink: 0;
 }
+
+
+/* --- Improved Navigation Drawer --- */
+
+/* The Drawer Container */
+.nav-drawer {
+  position: fixed;
+  top: 0;
+  left: -300px; /* Hidden off-screen */
+  width: 280px;
+  height: 100%;
+  background-color: #181818;
+  border-right: 1px solid #333;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1000;
+  padding: 20px;
+  overflow-y: auto;
+  box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+}
+
+.nav-drawer.open { left: 0; }
+
+/* The Dark Overlay */
+.nav-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: none;
+  z-index: 999;
+  backdrop-filter: blur(2px); /* Makes it look like a PWA overlay */
+}
+
+.nav-overlay.active { display: block; }
+
+/* Navigation Items Styling */
+.nav-section-title, .nav-group-title, .nav-category-title {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: #81c784;
+  padding: 10px 0;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.nav-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  margin: 2px 0;
+  border-radius: 4px;
+  color: #e0e0e0;
+  background: #252525;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.nav-item.active {
+  background: #1565c0;
+  color: white;
+  border-color: #1e88e5;
+}
+
+.nav-indent-1 { margin-left: 10px; width: calc(100% - 10px); }
+.nav-indent-2 { margin-left: 20px; width: calc(100% - 20px); }
+
+/* Hide children when collapsed */
+.nav-section-children, .nav-group-children, .nav-category-children {
+  display: none;
+}
+
+.expanded > .nav-section-children, 
+.expanded > .nav-group-children, 
+.expanded > .nav-category-children {
+  display: block;
+}
