@@ -15,7 +15,7 @@
     body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; overflow-x: hidden; }
     
     /* Header & Mobile Module Bar */
-    header { background: var(--panel); border-bottom: 1px solid var(--panel-border); padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.75rem; sticky: top; top: 0; z-index: 100; }
+    header { background: var(--panel); border-bottom: 1px solid var(--panel-border); padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.75rem; position: sticky; top: 0; z-index: 100; }
     .top-bar { display: flex; align-items: center; justify-content: space-between; }
     .logo { font-weight: 800; font-size: 1rem; letter-spacing: 0.5px; color: var(--accent); }
     
@@ -84,7 +84,7 @@
   <div class="toolbar">
     <div class="project-meta">
       <span>ACTIVE JOB #:</span>
-      <input type="text" id="project-id-input" value="JOB-2173" oninput="updateProjectId(this.value)" />
+      <input type="text" id="project-id-input" value="JOB-2173" onchange="updateProjectId(this.value)" />
     </div>
     
     <div class="mode-selector">
@@ -130,10 +130,16 @@
     function renderNavigation() {
       const select = document.getElementById('mobile-module-select');
       select.innerHTML = '';
+      
+      if (ModuleRegistry.size === 0) {
+        select.innerHTML = '<option>No Modules Registered</option>';
+        return;
+      }
+
       ModuleRegistry.forEach((mod) => {
         const opt = document.createElement('option');
         opt.value = mod.meta.id;
-        opt.textContent = mod.meta.title;
+        opt.textContent = `📋 Module: ${mod.meta.title}`;
         if (activeModule && activeModule.meta.id === mod.meta.id) opt.selected = true;
         select.appendChild(opt);
       });
@@ -242,11 +248,12 @@
             group.innerHTML = `<label>${comp.label}</label>`;
             const input = document.createElement('input');
             input.type = 'number';
-            input.inputMode = 'decimal'; // Triggers mobile numeric keypads
+            input.inputMode = 'decimal';
             input.pattern = '[0-9]*';
             input.step = '0.1';
             input.value = ActiveRecord.data[comp.fieldId] ?? '';
-            input.oninput = (e) => handleInput(comp.fieldId, e.target.value);
+            // Process math only when leaving input focus
+            input.onchange = (e) => handleInput(comp.fieldId, e.target.value);
             group.appendChild(input);
             card.appendChild(group);
             break;
@@ -258,7 +265,7 @@
               fBox.innerHTML = `
                 ⚠️ <strong>No linked Rice ($G_{mm}$) module found for ${ActiveRecord.projectId}.</strong><br/>
                 Enter manual target Rice ($G_{mm}$) value below for compaction % calculation:
-                <input type="number" inputmode="decimal" pattern="[0-9]*" step="0.001" style="margin-top:0.5rem;" value="${ActiveRecord.data.manualRiceGmm ?? ''}" oninput="handleInput('manualRiceGmm', this.value)" />
+                <input type="number" inputmode="decimal" pattern="[0-9]*" step="0.001" style="margin-top:0.5rem;" value="${ActiveRecord.data.manualRiceGmm ?? ''}" onchange="handleInput('manualRiceGmm', this.value)" />
               `;
               card.appendChild(fBox);
             }
@@ -328,7 +335,7 @@
               <div class="speed-type">Input (${f.unit || 'val'})</div>
             </div>
             <div class="speed-input-wrap">
-              <input type="number" inputmode="decimal" pattern="[0-9]*" value="${val}" oninput="handleInput('${f.id}', this.value)" />
+              <input type="number" inputmode="decimal" pattern="[0-9]*" value="${val}" onchange="handleInput('${f.id}', this.value)" />
             </div>
           `;
         }
