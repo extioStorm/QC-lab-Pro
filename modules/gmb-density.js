@@ -1,92 +1,76 @@
 registerModule({
   meta: {
-    id: "gmb-bulk-density",
-    title: "AASHTO T 166 (Gmb Core Density)",
-    category: "Volumetrics"
+    id: 'AASHTO-T166',
+    title: 'AASHTO T 166 (Gmb Core Density)',
+    version: '1.0.0',
+    description: 'Bulk Specific Gravity of Compacted Asphalt Mixtures Using Saturated Surface-Dry Specimens.'
   },
 
   fields: [
-    { id: "wtAir", label: "Dry Mass in Air (A)", unit: "g", computed: false },
-    { id: "wtH2o", label: "Submerged Mass (C)", unit: "g", computed: false },
-    { id: "ssdWt", label: "SSD Mass (B)", unit: "g", computed: false },
-    { id: "volDisplacement", label: "Bulk Volume (D = B - C)", unit: "cm³", computed: true },
-    { id: "blkGr", label: "Bulk Specific Gravity (Gmb)", unit: "", computed: true },
-    { id: "targetRiceGmm", label: "Reference Rice (Gmm)", unit: "", computed: false },
-    { id: "pctCompaction", label: "% Compaction (Gmb / Gmm * 100)", unit: "%", computed: true }
+    { id: 'massAirA', label: 'A: Dry Specimen Mass in Air', unit: 'g', precision: 1, computed: false },
+    { id: 'massSsdB', label: 'B: SSD Mass in Air', unit: 'g', precision: 1, computed: false },
+    { id: 'massWaterC', label: 'C: Submerged Specimen Mass', unit: 'g', precision: 1, computed: false },
+    { id: 'volumeV', label: 'Specimen Volume (B - C)', unit: 'cm³', precision: 1, computed: true },
+    { id: 'bulkGmb', label: 'Bulk Specific Gravity (Gmb)', unit: '', precision: 3, computed: true },
+    { id: 'targetRiceGmm', label: 'Target Max Gravity (Gmm)', unit: '', precision: 3, computed: false },
+    { id: 'percentCompaction', label: 'Compaction Degree (% Gmm)', unit: '%', precision: 1, computed: true }
   ],
 
-  // Sequential Math Chains (Runs via Engine Arithmetic Primitives)
   calculations: [
-    {
-      outputKey: "volDisplacement",
-      op: "SUBTRACT",
-      inputs: ["ssdWt", "wtH2o"],
-      precision: 1 // AASHTO T 166: Volume rounded to 0.1 cm³
-    },
-    {
-      outputKey: "blkGr",
-      op: "DIVIDE",
-      inputs: ["wtAir", "volDisplacement"],
-      precision: 3 // AASHTO T 166: Gmb rounded to 0.001
-    },
-    {
-      outputKey: "pctCompactionRatio",
-      op: "DIVIDE",
-      inputs: ["blkGr", "targetRiceGmm"],
-      precision: 5 // Unrounded intermediate ratio
-    },
-    {
-      outputKey: "pctCompaction",
-      op: "MULTIPLY",
-      inputs: ["pctCompactionRatio", "100_CONST"], // Evaluates Gmb/Gmm * 100
-      precision: 1 // Compaction rounded to 0.1%
-    }
+    { outputKey: 'volumeV', op: 'SUBTRACT', inputs: ['massSsdB', 'massWaterC'], precision: 1 },
+    { outputKey: 'bulkGmb', op: 'DIVIDE', inputs: ['massAirA', 'volumeV'], precision: 3 },
+    { outputKey: 'percentCompaction', op: 'DIVIDE', inputs: ['bulkGmb', 'targetRiceGmm'], precision: 3 },
+    { outputKey: 'percentCompaction', op: 'MULTIPLY', inputs: ['percentCompaction', 'const100'], precision: 1 }
   ],
 
-  // Stacked Layout UI Steps for Interactive Mode Wizard
   steps: [
     {
-      title: "Dry Mass (A)",
-      trainingText: "AASHTO T 166 requires recording the dry core mass in air prior to immersion.",
+      id: 'step-1',
+      title: 'Dry Mass (A)',
+      trainingText: 'AASHTO T 166 requires record of dry mass (A) after cooling to room temperature (25±5°C).',
       components: [
-        { type: "instruction", text: "Enter the dry mass of the core sample recorded in air." },
-        { type: "field-input", fieldId: "wtAir", label: "Dry Mass in Air (A) [grams]" },
-        { type: "action-button", label: "Confirm & Next Step" }
+        { type: 'instruction', text: 'Enter the dry mass of the core sample recorded in air.' },
+        { type: 'field-input', fieldId: 'massAirA', label: 'Dry Mass in Air (A) [grams]', unit: 'g' }
       ]
     },
     {
-      title: "Submerged & SSD Masses (C & B)",
-      trainingText: "Immerse sample in water bath at 77°F for 4±1 min before recording submerged mass C, then blot quickly to record SSD mass B.",
+      id: 'step-2',
+      title: 'SSD Mass in Air (B)',
+      trainingText: 'Dampen a towel to blot surface water quickly without drawing water from internal voids.',
       components: [
-        { type: "instruction", text: "Enter the submerged weight (C) and saturated surface-dry weight (B)." },
-        { type: "field-input", fieldId: "wtH2o", label: "Submerged Mass (C) [grams]" },
-        { type: "field-input", fieldId: "ssdWt", label: "SSD Mass (B) [grams]" },
-        { type: "action-button", label: "Calculate Displacement Volume" }
+        { type: 'instruction', text: 'Remove specimen from water bath, quickly blot surface dry with a damp towel, and record SSD mass B.' },
+        { type: 'field-input', fieldId: 'massSsdB', label: 'SSD Mass in Air (B) [grams]', unit: 'g' }
       ]
     },
     {
-      title: "Verify Bulk Volume (D = B - C)",
-      trainingText: "Intermediate Volume D is calculated explicitly as B - C and rounded to 0.1 cm³ per AASHTO specifications before evaluating Gmb.",
+      id: 'step-3',
+      title: 'Submerged Mass in Water (C)',
+      trainingText: 'Ensure the water bath is held at 25±1°C (77±1.8°F) and the suspension wire is completely tared.',
       components: [
-        { type: "instruction", text: "Review the calculated displacement volume." },
-        { type: "formula", expression: "Volume (D) = SSD Mass (B) - Submerged Mass (C)" },
-        { type: "value-display", fieldId: "volDisplacement", unit: "cm³" },
-        { type: "action-button", label: "Calculate Final Gmb & Compaction" }
+        { type: 'instruction', text: 'Immerse the specimen in the water bath for 3 to 5 minutes, then record submerged mass C.' },
+        { type: 'field-input', fieldId: 'massWaterC', label: 'Submerged Mass (C) [grams]', unit: 'g' }
       ]
     },
     {
-      title: "Bulk Density & % Compaction",
-      trainingText: "Percent Compaction compares the core Gmb against the project reference Rice Gmm value.",
+      id: 'step-4',
+      title: 'Volume & Gmb Calculations',
+      trainingText: 'Bulk gravity is calculated as A / (B - C). Volume is represented directly by (B - C).',
       components: [
-        { type: "instruction", text: "Final Bulk Specific Gravity (Gmb) and Mat Compaction Result:" },
-        { type: "fallback-rice-input" },
-        { type: "formula", expression: "Gmb = Dry Mass (A) / Volume (D)" },
-        { type: "value-display", fieldId: "blkGr", unit: "Gmb" },
-        { type: "value-display", fieldId: "pctCompaction", unit: "% Compaction" }
+        { type: 'formula', expression: 'Volume (cm³) = B - C' },
+        { type: 'value-display', fieldId: 'volumeV', unit: 'cm³' },
+        { type: 'formula', expression: 'Gmb = A / Volume' },
+        { type: 'value-display', fieldId: 'bulkGmb', unit: '' }
+      ]
+    },
+    {
+      id: 'step-5',
+      title: 'Compaction (% Gmm)',
+      trainingText: 'Density compaction percentage is computed against the active Rice test value (Gmm).',
+      components: [
+        { type: 'fallback-rice-input' },
+        { type: 'formula', expression: '% Compaction = (Gmb / Gmm) * 100' },
+        { type: 'value-display', fieldId: 'percentCompaction', unit: '%' }
       ]
     }
   ]
 });
-
-// Register constant for multiplication math step
-ActiveRecord.data["100_CONST"] = 100;
