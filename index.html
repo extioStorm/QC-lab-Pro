@@ -49,11 +49,9 @@
     .formula-box { background: #0d1117; border-left: 4px solid var(--accent); padding: 0.85rem 1rem; border-radius: 0 8px 8px 0; font-family: monospace; font-size: 0.95rem; margin-bottom: 1.25rem; color: #9ecbff; }
     
     /* Big Bold Display Cards */
-    .value-display { background: #0d1117; border: 1px solid var(--panel-border); padding: 1.25rem; border-radius: 10px; text-align: center; margin-bottom: 1.25rem; }
+    .value-display { background: #0d1117; border: 1px solid var(--panel-border); padding: 1.25rem; border-radius: 10px; text-align: center; margin-bottom: 1.25rem; cursor: pointer; }
     .value-display .val { font-size: 2.2rem; font-weight: 800; color: var(--success); }
     .value-display .unit { font-size: 1rem; color: var(--muted); margin-left: 0.3rem; font-weight: 500; }
-    
-    .fallback-banner { background: rgba(214, 158, 46, 0.12); border: 1px solid var(--warning); padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.9rem; color: #f6ad55; line-height: 1.4; }
 
     /* Navigation Action Buttons */
     .wizard-nav { display: flex; gap: 0.75rem; margin-top: 1rem; }
@@ -62,17 +60,19 @@
     .btn-primary:active { background: var(--accent-tap); transform: scale(0.99); }
     .btn-secondary { background: transparent; color: var(--muted); border: 1px solid var(--panel-border); }
     .btn-secondary:active { background: var(--input-bg); }
-    .btn-action { background: var(--input-bg); color: var(--accent); border: 1px solid var(--accent); margin-bottom: 1.25rem; }
+    .btn-action { background: var(--input-bg); color: var(--accent); border: 1px solid var(--accent); margin-bottom: 0.75rem; }
     .btn-action:active { background: var(--accent); color: white; }
 
     /* Speed Mode Mobile Field Cards */
-    .speed-card { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 10px; padding: 1rem; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .speed-card { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 10px; padding: 1rem; margin-bottom: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    .speed-card-main { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 1rem; }
     .speed-info { flex: 1; }
     .speed-label { font-size: 0.95rem; font-weight: 600; color: var(--text); }
     .speed-type { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; margin-top: 0.2rem; }
     .speed-input-wrap { width: 130px; }
     .speed-input-wrap input { height: 44px; font-size: 1rem; text-align: right; }
-    .speed-calc-val { font-size: 1.2rem; font-weight: 800; color: var(--success); text-align: right; }
+    .speed-calc-val { font-size: 1.2rem; font-weight: 800; color: var(--success); text-align: right; cursor: pointer; padding: 0.2rem 0.5rem; border-radius: 6px; }
+    .speed-calc-val:active { background: rgba(255,255,255,0.05); }
   </style>
 </head>
 <body>
@@ -117,9 +117,7 @@
       id: "CORE-001",
       projectId: "JOB-2173",
       timestamp: new Date().toISOString(),
-      data: {
-        manualRiceGmm: 2.510
-      }
+      data: {}
     };
 
     function updateProjectId(val) {
@@ -211,13 +209,7 @@
       do {
         evaluatedAny = false;
         activeModule.calculations.forEach(calc => {
-          const inputVals = calc.inputs.map(k => {
-            if (k === 'targetRiceGmm') {
-              return ActiveRecord.data.targetRiceGmm ?? ActiveRecord.data.manualRiceGmm ?? null;
-            }
-            return ActiveRecord.data[k] ?? null;
-          });
-
+          const inputVals = calc.inputs.map(k => ActiveRecord.data[k] ?? null);
           const hasAllInputs = inputVals.every(v => v !== null && !isNaN(v));
 
           if (hasAllInputs) {
@@ -251,6 +243,96 @@
         const calculatedVal = ActiveRecord.data[key];
         el.textContent = (calculatedVal !== null && calculatedVal !== undefined) ? calculatedVal : '--';
       });
+    }
+
+    // Generic Missing Dependency Inspection Query
+    function getMissingDependencies(outputKey) {
+      if (!activeModule || !activeModule.calculations) return [];
+
+      const calc = activeModule.calculations.find(c => c.outputKey === outputKey);
+      if (!calc) return [];
+
+      const missing = [];
+      calc.inputs.forEach(inputKey => {
+        const val = ActiveRecord.data[inputKey];
+        if (val === null || val === undefined || isNaN(val)) {
+          const fieldDef = activeModule.fields.find(f => f.id === inputKey) || { id: inputKey, label: inputKey };
+          
+          let sourceModuleId = null;
+          ModuleRegistry.forEach((mod, modId) => {
+            if (modId !== activeModule.meta.id && mod.fields.some(f => f.id === inputKey)) {
+              sourceModuleId = modId;
+            }
+          });
+
+          missing.push({
+            key: inputKey,
+            label: fieldDef.label,
+            unit: fieldDef.unit || 'val',
+            sourceModuleId: sourceModuleId
+          });
+        }
+      });
+
+      return missing;
+    }
+
+    // Generic Interactive Action Drawer for Uncalculated Fields
+    function handleMissingDependencyClick(outputKey) {
+      const calculatedVal = ActiveRecord.data[outputKey];
+      if (calculatedVal !== null && calculatedVal !== undefined) return;
+
+      const missing = getMissingDependencies(outputKey);
+      if (missing.length === 0) return;
+
+      const calcEl = document.querySelector(`[data-calc-field-id="${outputKey}"]`);
+      if (!calcEl) return;
+      const parentCard = calcEl.closest('.speed-card, .card');
+
+      const existingPrompt = parentCard.querySelector('.dependency-prompt');
+      if (existingPrompt) {
+        existingPrompt.remove();
+        return;
+      }
+
+      const promptBox = document.createElement('div');
+      promptBox.className = 'dependency-prompt';
+      promptBox.style.cssText = 'margin-top: 0.75rem; padding: 0.85rem; background: rgba(49, 130, 206, 0.12); border: 1px solid var(--accent); border-radius: 8px; width: 100%; box-sizing: border-box;';
+
+      let header = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+          <span style="font-size:0.85rem; color:var(--text); font-weight:700;">⚠️ Uncalculated Dependency</span>
+          <button onclick="this.closest('.dependency-prompt').remove()" 
+                  style="background:transparent; border:none; color:var(--muted); font-size:1.2rem; cursor:pointer; padding:0 0.3rem;">✕</button>
+        </div>
+      `;
+
+      let body = '';
+      missing.forEach(dep => {
+        body += `
+          <div style="font-size:0.85rem; color:var(--muted); margin-bottom:0.5rem;">
+            This calculation requires <strong>${dep.label}</strong>:
+          </div>
+          <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.75rem;">
+            <input type="number" inputmode="decimal" pattern="[0-9]*" placeholder="Enter manual ${dep.label}" 
+                   style="height:44px; font-size:0.95rem; flex:1;"
+                   onchange="handleInput('${dep.key}', this.value); promptBox.remove();" />
+          </div>
+        `;
+
+        if (dep.sourceModuleId && ModuleRegistry.has(dep.sourceModuleId)) {
+          const sourceMod = ModuleRegistry.get(dep.sourceModuleId);
+          body += `
+            <button class="btn-action" style="height:40px; font-size:0.85rem; margin-bottom:0.5rem; width:100%;" 
+                    onclick="selectModule('${dep.sourceModuleId}')">
+              🔀 Run ${sourceMod.meta.title} →
+            </button>
+          `;
+        }
+      });
+
+      promptBox.innerHTML = header + body;
+      parentCard.appendChild(promptBox);
     }
 
     function processAndRender() {
@@ -296,26 +378,9 @@
             input.step = '0.1';
             input.setAttribute('data-field-id', comp.fieldId);
             input.value = ActiveRecord.data[comp.fieldId] ?? '';
-            // Store quietly on change so typing remains buttery smooth
             input.onchange = (e) => handleInputSilent(comp.fieldId, e.target.value);
             group.appendChild(input);
             card.appendChild(group);
-            break;
-
-          case 'fallback-rice-input':
-            if (!ActiveRecord.data.targetRiceGmm) {
-              const fBox = document.createElement('div');
-              fBox.className = 'fallback-banner';
-              fBox.innerHTML = `
-                ⚠️ <strong>No linked Rice ($G_{mm}$) module found for ${ActiveRecord.projectId}.</strong><br/>
-                Enter manual target Rice ($G_{mm}$) value below for compaction % calculation:
-                <input type="number" inputmode="decimal" pattern="[0-9]*" step="0.001" style="margin-top:0.5rem;" 
-                       data-field-id="manualRiceGmm"
-                       value="${ActiveRecord.data.manualRiceGmm ?? ''}" 
-                       onchange="handleInputSilent('manualRiceGmm', this.value)" />
-              `;
-              card.appendChild(fBox);
-            }
             break;
 
           case 'formula':
@@ -329,7 +394,10 @@
             const vBox = document.createElement('div');
             vBox.className = 'value-display';
             const val = ActiveRecord.data[comp.fieldId] ?? '--';
-            vBox.innerHTML = `<div class="val">${val}<span class="unit">${comp.unit}</span></div>`;
+            vBox.innerHTML = `
+              <div class="val" data-calc-field-id="${comp.fieldId}">${val}<span class="unit">${comp.unit}</span></div>
+            `;
+            vBox.onclick = () => handleMissingDependencyClick(comp.fieldId);
             card.appendChild(vBox);
             break;
 
@@ -392,30 +460,30 @@
         const card = document.createElement('div');
         card.className = 'speed-card';
         let val = ActiveRecord.data[f.id] ?? '';
-        
-        if (f.id === 'targetRiceGmm' && !val) {
-          val = ActiveRecord.data.manualRiceGmm ?? '';
-        }
 
         if (f.computed) {
           card.innerHTML = `
-            <div class="speed-info">
-              <div class="speed-label">${f.label}</div>
-              <div class="speed-type">Calculated (${f.unit || 'val'})</div>
+            <div class="speed-card-main">
+              <div class="speed-info">
+                <div class="speed-label">${f.label}</div>
+                <div class="speed-type">Calculated (${f.unit || 'val'})</div>
+              </div>
+              <div class="speed-calc-val" data-calc-field-id="${f.id}" onclick="handleMissingDependencyClick('${f.id}')">${val !== '' ? val : '--'}</div>
             </div>
-            <div class="speed-calc-val" data-calc-field-id="${f.id}">${val !== '' ? val : '--'}</div>
           `;
         } else {
           card.innerHTML = `
-            <div class="speed-info">
-              <div class="speed-label">${f.label}</div>
-              <div class="speed-type">Input (${f.unit || 'val'})</div>
-            </div>
-            <div class="speed-input-wrap">
-              <input type="number" inputmode="decimal" pattern="[0-9]*" 
-                     data-field-id="${f.id}"
-                     value="${val}" 
-                     onchange="handleInput('${f.id}', this.value)" />
+            <div class="speed-card-main">
+              <div class="speed-info">
+                <div class="speed-label">${f.label}</div>
+                <div class="speed-type">Input (${f.unit || 'val'})</div>
+              </div>
+              <div class="speed-input-wrap">
+                <input type="number" inputmode="decimal" pattern="[0-9]*" 
+                       data-field-id="${f.id}"
+                       value="${val}" 
+                       onchange="handleInput('${f.id}', this.value)" />
+              </div>
             </div>
           `;
         }
