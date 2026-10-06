@@ -162,7 +162,18 @@
       processAndRender();
     }
 
+    // Save inputs currently on screen before navigating
+    function commitCurrentInputs() {
+      const inputs = document.querySelectorAll('#app-viewport input[data-field-id]');
+      inputs.forEach(input => {
+        const fieldId = input.getAttribute('data-field-id');
+        const numVal = input.value === '' ? null : parseFloat(input.value);
+        ActiveRecord.data[fieldId] = numVal;
+      });
+    }
+
     function goToStep(index) {
+      commitCurrentInputs();
       if (index >= 0 && index < activeModule.steps.length) {
         currentStepIndex = index;
         processAndRender();
@@ -170,6 +181,7 @@
     }
 
     function setMode(mode) {
+      commitCurrentInputs();
       currentMode = mode;
       document.querySelectorAll('.mode-btn').forEach(btn => {
         btn.classList.toggle('active', btn.textContent.toUpperCase().includes(mode.substring(0, 4)));
@@ -178,7 +190,7 @@
     }
 
     // =========================================================================
-    // 2. PROCESSING ENGINE (Primitives, AASHTO Rounding, Propagation)
+    // 2. PROCESSING ENGINE
     // =========================================================================
     const EngineOps = {
       ADD: (a, b) => a + b,
@@ -221,10 +233,9 @@
       } while (evaluatedAny);
     }
 
-    function handleInput(fieldId, value) {
+    function handleInputSilent(fieldId, value) {
       const numVal = value === '' ? null : parseFloat(value);
       ActiveRecord.data[fieldId] = numVal;
-      processAndRender();
     }
 
     function processAndRender() {
@@ -238,7 +249,7 @@
     }
 
     // =========================================================================
-    // 3. RENDERER ENGINE (Mobile Visual & Action Components)
+    // 3. RENDERER ENGINE
     // =========================================================================
     function renderInteractiveMode(container) {
       const step = activeModule.steps[currentStepIndex];
@@ -268,8 +279,10 @@
             input.inputMode = 'decimal';
             input.pattern = '[0-9]*';
             input.step = '0.1';
+            input.setAttribute('data-field-id', comp.fieldId);
             input.value = ActiveRecord.data[comp.fieldId] ?? '';
-            input.onchange = (e) => handleInput(comp.fieldId, e.target.value);
+            // Store quietly on change so typing remains buttery smooth
+            input.onchange = (e) => handleInputSilent(comp.fieldId, e.target.value);
             group.appendChild(input);
             card.appendChild(group);
             break;
@@ -281,7 +294,10 @@
               fBox.innerHTML = `
                 ⚠️ <strong>No linked Rice ($G_{mm}$) module found for ${ActiveRecord.projectId}.</strong><br/>
                 Enter manual target Rice ($G_{mm}$) value below for compaction % calculation:
-                <input type="number" inputmode="decimal" pattern="[0-9]*" step="0.001" style="margin-top:0.5rem;" value="${ActiveRecord.data.manualRiceGmm ?? ''}" onchange="handleInput('manualRiceGmm', this.value)" />
+                <input type="number" inputmode="decimal" pattern="[0-9]*" step="0.001" style="margin-top:0.5rem;" 
+                       data-field-id="manualRiceGmm"
+                       value="${ActiveRecord.data.manualRiceGmm ?? ''}" 
+                       onchange="handleInputSilent('manualRiceGmm', this.value)" />
               `;
               card.appendChild(fBox);
             }
@@ -307,6 +323,7 @@
             actBtn.className = 'btn-action';
             actBtn.textContent = comp.label;
             actBtn.onclick = () => {
+              commitCurrentInputs();
               if (comp.action === 'JUMP_MODULE') {
                 selectModule(comp.targetModuleId);
               } else if (comp.action === 'JUMP_STEP') {
@@ -318,7 +335,7 @@
         }
       });
 
-      // Default Linear Wizard Navigation
+      // Unified Dynamic Bottom Wizard Bar
       const nav = document.createElement('div');
       nav.className = 'wizard-nav';
 
@@ -380,7 +397,10 @@
               <div class="speed-type">Input (${f.unit || 'val'})</div>
             </div>
             <div class="speed-input-wrap">
-              <input type="number" inputmode="decimal" pattern="[0-9]*" value="${val}" onchange="handleInput('${f.id}', this.value)" />
+              <input type="number" inputmode="decimal" pattern="[0-9]*" 
+                     data-field-id="${f.id}"
+                     value="${val}" 
+                     onchange="handleInputSilent('${f.id}', this.value)" />
             </div>
           `;
         }
