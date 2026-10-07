@@ -4,613 +4,1797 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Asphalt QC Field System</title>
+
   <style>
     :root {
-      --bg: #0f1115; --panel: #181b20; --panel-border: #2a2e37;
-      --text: #f0f3f6; --muted: #8b949e; --accent: #3182ce;
-      --accent-tap: #2b6cb0; --success: #2e8540; --warning: #d69e2e;
+      --bg: #0f1115;
+      --panel: #181b20;
+      --panel-border: #2a2e37;
+      --text: #f0f3f6;
+      --muted: #8b949e;
+      --accent: #3182ce;
+      --accent-tap: #2b6cb0;
+      --success: #2e8540;
+      --warning: #d69e2e;
+      --danger: #c53030;
       --input-bg: #090a0c;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; overflow-x: hidden; }
-    
-    /* Header & Mobile Module Bar */
-    header { background: var(--panel); border-bottom: 1px solid var(--panel-border); padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.75rem; position: sticky; top: 0; z-index: 100; }
-    .top-bar { display: flex; align-items: center; justify-content: space-between; }
-    .logo { font-weight: 800; font-size: 1rem; letter-spacing: 0.5px; color: var(--accent); }
-    
-    .module-select-wrapper { width: 100%; }
-    select.mobile-nav { width: 100%; height: 48px; background: var(--input-bg); color: var(--text); border: 1px solid var(--panel-border); border-radius: 8px; padding: 0 0.75rem; font-size: 1rem; font-weight: 600; outline: none; }
 
-    /* Sticky Mode Switcher Toolbar */
-    .toolbar { background: var(--panel); border-bottom: 1px solid var(--panel-border); padding: 0.5rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
-    .project-meta { display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: var(--muted); }
-    .project-meta input { background: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text); padding: 0.4rem 0.6rem; border-radius: 6px; font-weight: 700; width: 120px; font-size: 0.95rem; text-align: right; }
-    
-    .mode-selector { display: flex; width: 100%; background: var(--input-bg); padding: 3px; border-radius: 8px; border: 1px solid var(--panel-border); height: 44px; }
-    .mode-btn { flex: 1; background: transparent; border: none; color: var(--muted); border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
-    .mode-btn.active { background: var(--accent); color: white; }
-    
-    /* Mobile Main Viewport */
-    main { flex: 1; padding: 1rem; display: flex; justify-content: center; }
-    .container { width: 100%; max-width: 600px; }
-    
-    /* Touch-Optimized Component Cards */
-    .card { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-    .card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--text); }
-    .instruction { color: var(--muted); font-size: 0.95rem; margin-bottom: 1.25rem; line-height: 1.4; }
-    
-    /* Giant Touch Targets for Mobile Inputs */
-    .field-group { margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 0.5rem; }
-    label { font-size: 0.9rem; color: var(--muted); font-weight: 600; }
-    input[type="number"], input[type="text"] { background: var(--input-bg); border: 1.5px solid var(--panel-border); color: var(--text); height: 52px; padding: 0 0.85rem; border-radius: 8px; font-size: 1.1rem; font-weight: 600; width: 100%; transition: border-color 0.2s, box-shadow 0.2s; }
-    input:focus { outline: none; border-color: var(--accent); background: #000; }
-    
-    /* Input Highlight Animation for Local Focus */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--panel-border);
+      padding: 0.75rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      font-weight: 800;
+      font-size: 1rem;
+      letter-spacing: 0.5px;
+      color: var(--accent);
+    }
+
+    .module-select-wrapper {
+      width: 100%;
+    }
+
+    select.mobile-nav {
+      width: 100%;
+      height: 48px;
+      background: var(--input-bg);
+      color: var(--text);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 0 0.75rem;
+      font-size: 1rem;
+      font-weight: 600;
+      outline: none;
+    }
+
+    .toolbar {
+      background: var(--panel);
+      border-bottom: 1px solid var(--panel-border);
+      padding: 0.5rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .project-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .project-meta input {
+      background: var(--input-bg);
+      border: 1px solid var(--panel-border);
+      color: var(--text);
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+      font-weight: 700;
+      width: 140px;
+      font-size: 0.95rem;
+      text-align: right;
+    }
+
+    .mode-selector {
+      display: flex;
+      width: 100%;
+      background: var(--input-bg);
+      padding: 3px;
+      border-radius: 8px;
+      border: 1px solid var(--panel-border);
+      height: 44px;
+    }
+
+    .mode-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .mode-btn.active {
+      background: var(--accent);
+      color: white;
+    }
+
+    .workday-bar {
+      display: flex;
+      gap: 0.5rem;
+      overflow-x: auto;
+      padding: 0.5rem 1rem;
+      background: #111318;
+      border-bottom: 1px solid var(--panel-border);
+    }
+
+    .workday-item {
+      flex: 0 0 auto;
+      background: var(--input-bg);
+      border: 1px solid var(--panel-border);
+      color: var(--muted);
+      border-radius: 7px;
+      padding: 0.5rem 0.7rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .workday-item.active {
+      border-color: var(--accent);
+      color: var(--text);
+      background: rgba(49, 130, 206, 0.15);
+    }
+
+    main {
+      flex: 1;
+      padding: 1rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 600px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+    }
+
+    .instruction {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 1.25rem;
+      line-height: 1.4;
+    }
+
+    .field-group {
+      margin-bottom: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    label {
+      font-size: 0.9rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    input[type="number"],
+    input[type="text"] {
+      background: var(--input-bg);
+      border: 1.5px solid var(--panel-border);
+      color: var(--text);
+      height: 52px;
+      padding: 0 0.85rem;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      width: 100%;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: #000;
+    }
+
     .input-highlight {
       border-color: var(--warning) !important;
       box-shadow: 0 0 10px rgba(214, 158, 46, 0.5) !important;
     }
 
-    .formula-box { background: #0d1117; border-left: 4px solid var(--accent); padding: 0.85rem 1rem; border-radius: 0 8px 8px 0; font-family: monospace; font-size: 0.95rem; margin-bottom: 1.25rem; color: #9ecbff; }
-    
-    /* Big Bold Display Cards */
-    .value-display { background: #0d1117; border: 1px solid var(--panel-border); padding: 1.25rem; border-radius: 10px; text-align: center; margin-bottom: 1.25rem; cursor: pointer; }
-    .value-display .val { font-size: 2.2rem; font-weight: 800; color: var(--success); }
-    .value-display .unit { font-size: 1rem; color: var(--muted); margin-left: 0.3rem; font-weight: 500; }
+    .formula-box {
+      background: #0d1117;
+      border-left: 4px solid var(--accent);
+      padding: 0.85rem 1rem;
+      border-radius: 0 8px 8px 0;
+      font-family: monospace;
+      font-size: 0.95rem;
+      margin-bottom: 1.25rem;
+      color: #9ecbff;
+    }
 
-    /* Navigation Action Buttons */
-    .wizard-nav { display: flex; gap: 0.75rem; margin-top: 1rem; }
-    .btn-primary, .btn-secondary, .btn-action { height: 52px; border-radius: 8px; font-weight: 700; cursor: pointer; flex: 1; font-size: 1rem; display: flex; align-items: center; justify-content: center; }
-    .btn-primary { background: var(--accent); color: white; border: none; }
-    .btn-primary:active { background: var(--accent-tap); transform: scale(0.99); }
-    .btn-secondary { background: transparent; color: var(--muted); border: 1px solid var(--panel-border); }
-    .btn-secondary:active { background: var(--input-bg); }
-    .btn-action { background: var(--input-bg); color: var(--accent); border: 1px solid var(--accent); margin-bottom: 0.75rem; }
-    .btn-action:active { background: var(--accent); color: white; }
+    .value-display {
+      background: #0d1117;
+      border: 1px solid var(--panel-border);
+      padding: 1.25rem;
+      border-radius: 10px;
+      text-align: center;
+      margin-bottom: 1.25rem;
+      cursor: pointer;
+    }
 
-    /* Speed Mode Mobile Field Cards */
-    .speed-card { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 10px; padding: 1rem; margin-bottom: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
-    .speed-card-main { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 1rem; }
-    .speed-info { flex: 1; }
-    .speed-label { font-size: 0.95rem; font-weight: 600; color: var(--text); }
-    .speed-type { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; margin-top: 0.2rem; }
-    .speed-input-wrap { width: 130px; }
-    .speed-input-wrap input { height: 44px; font-size: 1rem; text-align: right; }
-    .speed-calc-val { font-size: 1.2rem; font-weight: 800; color: var(--success); text-align: right; cursor: pointer; padding: 0.2rem 0.5rem; border-radius: 6px; }
-    .speed-calc-val:active { background: rgba(255,255,255,0.05); }
+    .value-display .val {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: var(--success);
+    }
+
+    .value-display .unit {
+      font-size: 1rem;
+      color: var(--muted);
+      margin-left: 0.3rem;
+      font-weight: 500;
+    }
+
+    .provenance {
+      margin-top: 0.6rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .dependency-box {
+      margin-top: 0.75rem;
+      padding: 0.85rem;
+      background: rgba(49, 130, 206, 0.12);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+    }
+
+    .dependency-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .dependency-detail {
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.4;
+      margin-bottom: 0.65rem;
+    }
+
+    .wizard-nav {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .btn-primary,
+    .btn-secondary,
+    .btn-action {
+      height: 52px;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      flex: 1;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      border: none;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--panel-border);
+    }
+
+    .btn-action {
+      background: var(--input-bg);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      margin-bottom: 0.75rem;
+    }
+
+    .speed-card {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .speed-card-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      gap: 1rem;
+    }
+
+    .speed-info {
+      flex: 1;
+    }
+
+    .speed-label {
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .speed-type {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-top: 0.2rem;
+    }
+
+    .speed-input-wrap {
+      width: 130px;
+    }
+
+    .speed-input-wrap input {
+      height: 44px;
+      font-size: 1rem;
+      text-align: right;
+    }
+
+    .speed-calc-val {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--success);
+      text-align: right;
+      cursor: pointer;
+      padding: 0.2rem 0.5rem;
+    }
+
+    .status-ok {
+      color: var(--success);
+    }
+
+    .status-warning {
+      color: var(--warning);
+    }
   </style>
 </head>
+
 <body>
 
-  <header>
-    <div class="top-bar">
-      <div class="logo">QC FIELD ENGINE</div>
-      <div style="font-size: 0.75rem; color: var(--muted); background: var(--input-bg); padding: 0.2rem 0.5rem; border-radius: 4px;">OFFLINE READY</div>
-    </div>
-    <div class="module-select-wrapper">
-      <select id="mobile-module-select" class="mobile-nav" onchange="selectModule(this.value)"></select>
-    </div>
-  </header>
-
-  <div class="toolbar">
-    <div class="project-meta">
-      <span>ACTIVE JOB #:</span>
-      <input type="text" id="project-id-input" value="JOB-2173" onchange="updateProjectId(this.value)" />
-    </div>
-    
-    <div class="mode-selector">
-      <button class="mode-btn active" onclick="setMode('INTERACTIVE')">Step Wizard</button>
-      <button class="mode-btn" onclick="setMode('SPEED')">Speed Sheet</button>
-      <button class="mode-btn" onclick="setMode('TRAINING')">Training</button>
+<header>
+  <div class="top-bar">
+    <div class="logo">QC FIELD ENGINE</div>
+    <div style="font-size:0.75rem;color:var(--muted);background:var(--input-bg);padding:0.2rem 0.5rem;border-radius:4px;">
+      OFFLINE READY
     </div>
   </div>
 
-  <main>
-    <div class="container" id="app-viewport"></div>
-  </main>
+  <div class="module-select-wrapper">
+    <select id="mobile-module-select" class="mobile-nav" onchange="selectModule(this.value)"></select>
+  </div>
+</header>
 
-  <script>
-    // =========================================================================
-    // 1. GLOBAL REGISTRY & HIERARCHICAL PROJECT STORE
-    // =========================================================================
-    const ModuleRegistry = new Map();
-    let activeModule = null;
-    let activeProjectId = "JOB-2173";
-    let currentMode = 'INTERACTIVE';
-    let currentStepIndex = 0;
+<div class="toolbar">
+  <div class="project-meta">
+    <span>ACTIVE JOB #:</span>
+    <input type="text" id="project-id-input" value="JOB-2173" onchange="updateProjectId(this.value)">
+  </div>
 
-    // Object-Oriented Project Store Tree
-    const ProjectStore = {
-      projects: {
-        "JOB-2173": {
-          projectId: "JOB-2173",
-          labTests: {}
-        }
+  <div class="mode-selector">
+    <button class="mode-btn active" onclick="setMode('INTERACTIVE')">Step Wizard</button>
+    <button class="mode-btn" onclick="setMode('SPEED')">Speed Sheet</button>
+    <button class="mode-btn" onclick="setMode('TRAINING')">Training</button>
+  </div>
+</div>
+
+<div class="workday-bar" id="workday-navigation"></div>
+
+<main>
+  <div class="container" id="app-viewport"></div>
+</main>
+
+<script>
+/* =========================================================================
+   1. MODULE REGISTRY
+   ========================================================================= */
+
+const ModuleRegistry = new Map();
+
+let activeModule = null;
+let activeProjectId = "JOB-2173";
+let currentMode = "INTERACTIVE";
+let currentStepIndex = 0;
+
+
+/* =========================================================================
+   2. DATA MODEL
+   =========================================================================
+   
+   The application distinguishes:
+   
+   Project
+      ├── Material Samples
+      ├── Cores
+      └── Tests
+   
+   A TestRecord belongs to a parent object and may produce values.
+   Tests do not randomly search unrelated records.
+   ========================================================================= */
+
+const ProjectStore = {
+  projects: {}
+};
+
+
+function createProject(projectId) {
+  return {
+    recordType: "PROJECT",
+    projectId,
+    createdAt: new Date().toISOString(),
+    modifiedAt: new Date().toISOString(),
+
+    mixDesigns: {},
+    materialSamples: {},
+    cores: {},
+    tests: {},
+
+    dailyRecords: {}
+  };
+}
+
+
+function createMaterialSample(sampleId, projectId) {
+  return {
+    recordType: "MATERIAL_SAMPLE",
+    sampleId,
+    projectId,
+
+    createdAt: new Date().toISOString(),
+    modifiedAt: new Date().toISOString(),
+
+    metadata: {},
+    testRefs: []
+  };
+}
+
+
+function createCore(coreId, projectId) {
+  return {
+    recordType: "CORE",
+    coreId,
+    projectId,
+
+    createdAt: new Date().toISOString(),
+    modifiedAt: new Date().toISOString(),
+
+    metadata: {},
+    testRefs: []
+  };
+}
+
+
+function createTestRecord(testId, moduleId, parentRef) {
+  return {
+    recordType: "TEST",
+    testId,
+    moduleId,
+
+    parentRef,
+
+    createdAt: new Date().toISOString(),
+    modifiedAt: new Date().toISOString(),
+
+    inputs: {},
+    calculatedOutputs: {},
+    manualOverrides: {},
+    effectiveOutputs: {},
+
+    calculationSteps: [],
+    provenance: {}
+  };
+}
+
+
+function getProjectNode(projectId = activeProjectId) {
+  if (!ProjectStore.projects[projectId]) {
+    ProjectStore.projects[projectId] = createProject(projectId);
+  }
+
+  return ProjectStore.projects[projectId];
+}
+
+
+function getCurrentTestRecord() {
+  if (!activeModule) return null;
+
+  const project = getProjectNode();
+
+  if (!project.tests[activeModule.meta.id]) {
+    project.tests[activeModule.meta.id] = createTestRecord(
+      `${activeModule.meta.id}-${project.projectId}`,
+      activeModule.meta.id,
+      {
+        recordType: "PROJECT",
+        projectId: project.projectId
+      }
+    );
+  }
+
+  return project.tests[activeModule.meta.id];
+}
+
+
+/* =========================================================================
+   3. GENERIC RECORD ACCESS
+   ========================================================================= */
+
+function saveRecord(record) {
+  record.modifiedAt = new Date().toISOString();
+  return record;
+}
+
+
+/* =========================================================================
+   4. MODULE REGISTRATION
+   ========================================================================= */
+
+function registerModule(moduleObj) {
+  if (!moduleObj || !moduleObj.meta || !moduleObj.meta.id) {
+    throw new Error("Cannot register module without meta.id");
+  }
+
+  ModuleRegistry.set(moduleObj.meta.id, moduleObj);
+
+  renderNavigation();
+  renderWorkdayNavigation();
+
+  if (!activeModule) {
+    selectModule(moduleObj.meta.id);
+  }
+}
+
+
+function renderNavigation() {
+  const select = document.getElementById("mobile-module-select");
+
+  select.innerHTML = "";
+
+  if (ModuleRegistry.size === 0) {
+    select.innerHTML = "<option>No Modules Registered</option>";
+    return;
+  }
+
+  ModuleRegistry.forEach(mod => {
+    const option = document.createElement("option");
+
+    option.value = mod.meta.id;
+    option.textContent = `📋 ${mod.meta.title}`;
+
+    if (activeModule && activeModule.meta.id === mod.meta.id) {
+      option.selected = true;
+    }
+
+    select.appendChild(option);
+  });
+}
+
+
+/* =========================================================================
+   5. PREQUEL / SEQUEL WORKDAY NAVIGATION
+   ========================================================================= */
+
+function getWorkdayChain(startModuleId) {
+  if (!ModuleRegistry.has(startModuleId)) {
+    return [];
+  }
+
+  const chain = [];
+  const visited = new Set();
+
+  function addModule(moduleId) {
+    if (visited.has(moduleId)) return;
+    if (!ModuleRegistry.has(moduleId)) return;
+
+    visited.add(moduleId);
+
+    const module = ModuleRegistry.get(moduleId);
+
+    const prequels = module.meta.prequels || [];
+
+    prequels.forEach(addModule);
+
+    chain.push(moduleId);
+
+    const sequels = module.meta.sequels || [];
+
+    sequels.forEach(sequelId => {
+      if (!visited.has(sequelId)) {
+        addModule(sequelId);
+      }
+    });
+  }
+
+  addModule(startModuleId);
+
+  return chain;
+}
+
+
+function renderWorkdayNavigation() {
+  const bar = document.getElementById("workday-navigation");
+
+  if (!bar) return;
+
+  bar.innerHTML = "";
+
+  if (!activeModule) return;
+
+  const chain = getWorkdayChain(activeModule.meta.id);
+
+  chain.forEach(moduleId => {
+    const module = ModuleRegistry.get(moduleId);
+
+    const button = document.createElement("button");
+
+    button.className = "workday-item";
+
+    if (moduleId === activeModule.meta.id) {
+      button.classList.add("active");
+    }
+
+    button.textContent = module.meta.shortTitle || module.meta.title;
+
+    button.onclick = () => selectModule(moduleId);
+
+    bar.appendChild(button);
+  });
+}
+
+
+/* =========================================================================
+   6. MODULE SELECTION
+   ========================================================================= */
+
+function selectModule(moduleId) {
+  if (!ModuleRegistry.has(moduleId)) {
+    alert(`Module ${moduleId} is not registered.`);
+    return;
+  }
+
+  commitCurrentInputs();
+
+  activeModule = ModuleRegistry.get(moduleId);
+  currentStepIndex = 0;
+
+  renderNavigation();
+  renderWorkdayNavigation();
+  processAndRender();
+}
+
+
+/* =========================================================================
+   7. INPUT COMMIT
+   ========================================================================= */
+
+function commitCurrentInputs() {
+  if (!activeModule) return;
+
+  const test = getCurrentTestRecord();
+
+  document
+    .querySelectorAll("#app-viewport input[data-field-id]")
+    .forEach(input => {
+      const fieldId = input.getAttribute("data-field-id");
+
+      if (input.value === "") {
+        test.inputs[fieldId] = null;
+      } else {
+        test.inputs[fieldId] = parseFloat(input.value);
+      }
+    });
+
+  saveRecord(test);
+}
+
+
+function handleInputSilent(fieldId, value) {
+  if (!activeModule) return;
+
+  const test = getCurrentTestRecord();
+
+  test.inputs[fieldId] =
+    value === "" ? null : parseFloat(value);
+
+  saveRecord(test);
+}
+
+
+function handleInput(fieldId, value) {
+  handleInputSilent(fieldId, value);
+
+  processRecord();
+  patchCalculatedFields();
+}
+
+
+/* =========================================================================
+   8. RELATIONSHIP RESOLUTION
+   =========================================================================
+   
+   This replaces the old "search every test for a matching key" behavior.
+   
+   A dependency declares:
+   
+       providerModule
+       relationship
+       selection
+   
+   The resolver follows those rules.
+   ========================================================================= */
+
+function resolveDependency(dependency) {
+  if (!activeModule || !dependency) {
+    return null;
+  }
+
+  const project = getProjectNode();
+
+  if (dependency.relationship === "SAME_PROJECT") {
+    return resolveSameProjectDependency(project, dependency);
+  }
+
+  return null;
+}
+
+
+function resolveSameProjectDependency(project, dependency) {
+  const candidates = [];
+
+  Object.values(project.tests).forEach(test => {
+    if (test.moduleId !== dependency.providerModuleId) {
+      return;
+    }
+
+    const value = test.effectiveOutputs?.[dependency.valueKey];
+
+    if (value === undefined || value === null || isNaN(value)) {
+      return;
+    }
+
+    candidates.push({
+      test,
+      value
+    });
+  });
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  /*
+   * Selection is deliberately explicit.
+   * We do not silently use the first matching value.
+   */
+  if (dependency.selection === "MOST_RECENT") {
+    candidates.sort((a, b) => {
+      const aDate = new Date(
+        a.test.testedAt ||
+        a.test.modifiedAt ||
+        a.test.createdAt
+      );
+
+      const bDate = new Date(
+        b.test.testedAt ||
+        b.test.modifiedAt ||
+        b.test.createdAt
+      );
+
+      return bDate - aDate;
+    });
+  }
+
+  const selected = candidates[0];
+
+  return {
+    value: selected.value,
+
+    source: {
+      recordType: "TEST",
+      testId: selected.test.testId,
+      moduleId: selected.test.moduleId,
+      projectId: project.projectId
+    },
+
+    selection: dependency.selection || "FIRST_VALID"
+  };
+}
+
+
+/* =========================================================================
+   9. VALUE RESOLUTION
+   ========================================================================= */
+
+function getLocalValue(key) {
+  const test = getCurrentTestRecord();
+
+  if (!test) return null;
+
+  if (
+    test.inputs[key] !== undefined &&
+    test.inputs[key] !== null
+  ) {
+    return test.inputs[key];
+  }
+
+  if (
+    test.effectiveOutputs[key] !== undefined &&
+    test.effectiveOutputs[key] !== null
+  ) {
+    return test.effectiveOutputs[key];
+  }
+
+  return null;
+}
+
+
+function getResolvedValue(key) {
+  const local = getLocalValue(key);
+
+  if (local !== null && local !== undefined) {
+    return {
+      value: local,
+      source: {
+        recordType: "CURRENT_TEST",
+        testId: getCurrentTestRecord().testId
       }
     };
+  }
 
-    function getProjectNode(projectId = activeProjectId) {
-      if (!ProjectStore.projects[projectId]) {
-        ProjectStore.projects[projectId] = { projectId, labTests: {} };
-      }
-      return ProjectStore.projects[projectId];
-    }
+  if (!activeModule || !activeModule.dependencies) {
+    return null;
+  }
 
-    function getTestNode(moduleId, projectId = activeProjectId) {
-      const proj = getProjectNode(projectId);
-      if (!proj.labTests[moduleId]) {
-        proj.labTests[moduleId] = {
-          inputs: {},
-          calculatedOutputs: {},
-          manualOverrides: {},
-          effectiveOutputs: {}
-        };
-      }
-      return proj.labTests[moduleId];
-    }
+  const dependency = activeModule.dependencies.find(
+    dep => dep.valueKey === key
+  );
 
-    // High-Level Data Getter adhering to Parallel Manual Override Precedence
-    function getStoredValue(key, moduleId = activeModule?.meta?.id) {
-      if (!moduleId) return null;
-      const testNode = getTestNode(moduleId);
+  if (!dependency) {
+    return null;
+  }
 
-      // 1. Direct Local Input
-      if (testNode.inputs[key] !== undefined && testNode.inputs[key] !== null) {
-        return testNode.inputs[key];
-      }
+  return resolveDependency(dependency);
+}
 
-      // 2. Local Effective Calculation / Override
-      if (testNode.effectiveOutputs[key] !== undefined && testNode.effectiveOutputs[key] !== null) {
-        return testNode.effectiveOutputs[key];
-      }
 
-      // 3. Project-Wide Traversal across all Lab Test modules
-      const proj = getProjectNode();
-      for (const modId in proj.labTests) {
-        const node = proj.labTests[modId];
-        if (node.effectiveOutputs[key] !== undefined && node.effectiveOutputs[key] !== null) {
-          return node.effectiveOutputs[key];
-        }
-      }
+/* =========================================================================
+   10. ENGINE OPERATIONS
+   ========================================================================= */
 
+const EngineOps = {
+
+  ADD: (a, b) => a + b,
+
+  SUBTRACT: (a, b) => a - b,
+
+  MULTIPLY: (a, b) => a * b,
+
+  DIVIDE: (a, b) => {
+    if (b === 0 || b === null || b === undefined) {
       return null;
     }
 
-    function updateProjectId(val) {
-      activeProjectId = val;
-      getProjectNode(activeProjectId);
-      processAndRender();
+    return a / b;
+  },
+
+  ROUND: (value, decimals) => {
+    if (value === null || value === undefined || isNaN(value)) {
+      return null;
     }
 
-    function registerModule(moduleObj) {
-      ModuleRegistry.set(moduleObj.meta.id, moduleObj);
-      renderNavigation();
-      if (!activeModule) selectModule(moduleObj.meta.id);
-    }
+    const factor = Math.pow(10, decimals);
 
-    function renderNavigation() {
-      const select = document.getElementById('mobile-module-select');
-      select.innerHTML = '';
-      
-      if (ModuleRegistry.size === 0) {
-        select.innerHTML = '<option>No Modules Registered</option>';
-        return;
-      }
+    return Math.round(
+      (value + Number.EPSILON) * factor
+    ) / factor;
+  }
 
-      ModuleRegistry.forEach((mod) => {
-        const opt = document.createElement('option');
-        opt.value = mod.meta.id;
-        opt.textContent = `📋 Module: ${mod.meta.title}`;
-        if (activeModule && activeModule.meta.id === mod.meta.id) opt.selected = true;
-        select.appendChild(opt);
-      });
-    }
+};
 
-    function selectModule(id) {
-      if (!ModuleRegistry.has(id)) {
-        alert(`Module ${id} is not registered yet.`);
-        return;
-      }
-      activeModule = ModuleRegistry.get(id);
-      currentStepIndex = 0;
-      renderNavigation();
-      processAndRender();
-    }
 
-    // Save inputs currently on screen before navigating
-    function commitCurrentInputs() {
-      if (!activeModule) return;
-      const inputs = document.querySelectorAll('#app-viewport input[data-field-id]');
-      const testNode = getTestNode(activeModule.meta.id);
-      inputs.forEach(input => {
-        const fieldId = input.getAttribute('data-field-id');
-        const numVal = input.value === '' ? null : parseFloat(input.value);
-        testNode.inputs[fieldId] = numVal;
-      });
-    }
+/* =========================================================================
+   11. PROCESSING ENGINE
+   ========================================================================= */
 
-    function goToStep(index) {
-      commitCurrentInputs();
-      if (index >= 0 && index < activeModule.steps.length) {
-        currentStepIndex = index;
-        processAndRender();
-      }
-    }
+function processRecord() {
+  if (!activeModule || !activeModule.calculations) {
+    return;
+  }
 
-    function setMode(mode) {
-      commitCurrentInputs();
-      currentMode = mode;
-      document.querySelectorAll('.mode-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.textContent.toUpperCase().includes(mode.substring(0, 4)));
-      });
-      processAndRender();
-    }
+  const test = getCurrentTestRecord();
 
-    // =========================================================================
-    // 2. PROCESSING ENGINE & CALCULATION TRAVERSAL
-    // =========================================================================
-    const EngineOps = {
-      ADD: (a, b) => a + b,
-      SUBTRACT: (a, b) => a - b,
-      MULTIPLY: (a, b) => a * b,
-      DIVIDE: (a, b) => (b === 0 || b === null ? null : a / b),
-      ROUND_AASHTO: (val, decimals) => {
-        if (val === null || isNaN(val)) return null;
-        const factor = Math.pow(10, decimals);
-        return Math.round((val + Number.EPSILON) * factor) / factor;
-      }
-    };
+  let changed = true;
+  let guard = 0;
 
-    function processRecord() {
-      if (!activeModule || !activeModule.calculations) return;
+  while (changed && guard < 100) {
 
-      const testNode = getTestNode(activeModule.meta.id);
+    changed = false;
+    guard++;
 
-      let evaluatedAny = false;
-      do {
-        evaluatedAny = false;
-        activeModule.calculations.forEach(calc => {
-          const inputVals = calc.inputs.map(k => getStoredValue(k));
-          const hasAllInputs = inputVals.every(v => v !== null && !isNaN(v));
+    activeModule.calculations.forEach(calc => {
 
-          if (hasAllInputs) {
-            const rawResult = EngineOps[calc.op](...inputVals);
-            const roundedResult = EngineOps.ROUND_AASHTO(rawResult, calc.precision);
+      const inputValues = [];
 
-            if (testNode.calculatedOutputs[calc.outputKey] !== roundedResult) {
-              testNode.calculatedOutputs[calc.outputKey] = roundedResult;
-              
-              // Effective output resolves manual overrides first, then calculated results
-              testNode.effectiveOutputs[calc.outputKey] = 
-                testNode.manualOverrides[calc.outputKey] ?? roundedResult;
-                
-              evaluatedAny = true;
-            }
-          }
-        });
-      } while (evaluatedAny);
-    }
+      for (const input of calc.inputs) {
 
-    function handleInputSilent(fieldId, value) {
-      if (!activeModule) return;
-      const testNode = getTestNode(activeModule.meta.id);
-      testNode.inputs[fieldId] = value === '' ? null : parseFloat(value);
-    }
-
-    function handleInput(fieldId, value) {
-      if (!activeModule) return;
-      const testNode = getTestNode(activeModule.meta.id);
-      testNode.inputs[fieldId] = value === '' ? null : parseFloat(value);
-      
-      // 1. Run engine math in memory
-      processRecord();
-      
-      // 2. Patch calculated fields directly without re-rendering DOM
-      document.querySelectorAll('[data-calc-field-id]').forEach(el => {
-        const key = el.getAttribute('data-calc-field-id');
-        const calculatedVal = getStoredValue(key);
-        el.textContent = (calculatedVal !== null && calculatedVal !== undefined) ? calculatedVal : '--';
-      });
-    }
-
-    function handleManualOverride(key, providerModuleId, value) {
-      const numVal = value === '' ? null : parseFloat(value);
-      const targetModule = providerModuleId || activeModule.meta.id;
-      const testNode = getTestNode(targetModule);
-
-      // Store in parallel manual overrides
-      testNode.manualOverrides[key] = numVal;
-      testNode.effectiveOutputs[key] = numVal;
-
-      processAndRender();
-    }
-
-    // Structural Dependency Resolution Query
-    function getMissingDependencies(outputKey) {
-      if (!activeModule || !activeModule.calculations) return [];
-
-      const calc = activeModule.calculations.find(c => c.outputKey === outputKey);
-      if (!calc) return [];
-
-      const missing = [];
-      calc.inputs.forEach(inputKey => {
-        const val = getStoredValue(inputKey);
-        if (val === null || val === undefined || isNaN(val)) {
-          // Find input definition in module fields
-          const fieldDef = activeModule.fields.find(f => f.id === inputKey) || { id: inputKey, label: inputKey, type: 'LOCAL' };
-          
-          missing.push({
-            key: inputKey,
-            label: fieldDef.label,
-            unit: fieldDef.unit || 'val',
-            type: fieldDef.type || 'LOCAL',
-            providerModuleId: fieldDef.providerModuleId || null
-          });
+        if (
+          typeof input === "number" &&
+          !isNaN(input)
+        ) {
+          inputValues.push(input);
+          continue;
         }
+
+        const resolved = getResolvedValue(input);
+
+        if (
+          !resolved ||
+          resolved.value === null ||
+          resolved.value === undefined ||
+          isNaN(resolved.value)
+        ) {
+          return;
+        }
+
+        inputValues.push(resolved.value);
+      }
+
+      const operation = EngineOps[calc.op];
+
+      if (typeof operation !== "function") {
+        console.error(
+          `Unknown engine operation: ${calc.op}`
+        );
+        return;
+      }
+
+      const rawResult = operation(...inputValues);
+
+      if (
+        rawResult === null ||
+        rawResult === undefined ||
+        isNaN(rawResult)
+      ) {
+        return;
+      }
+
+      const roundedResult = EngineOps.ROUND(
+        rawResult,
+        calc.precision ?? 3
+      );
+
+      const previous =
+        test.calculatedOutputs[calc.outputKey];
+
+      test.calculatedOutputs[calc.outputKey] =
+        roundedResult;
+
+      const override =
+        test.manualOverrides[calc.outputKey];
+
+      test.effectiveOutputs[calc.outputKey] =
+        override !== undefined &&
+        override !== null
+          ? override
+          : roundedResult;
+
+      /*
+       * Preserve the calculation chain.
+       */
+      test.calculationSteps.push({
+        calculationId: calc.id,
+        outputKey: calc.outputKey,
+        rawResult,
+        roundedResult,
+        precision: calc.precision ?? 3,
+        calculatedAt: new Date().toISOString()
       });
 
-      return missing;
+      /*
+       * Preserve source information for dependencies.
+       */
+      test.provenance[calc.outputKey] = {
+        type: "CALCULATED",
+        calculationId: calc.id,
+        inputs: calc.inputs
+      };
+
+      if (previous !== roundedResult) {
+        changed = true;
+      }
+    });
+  }
+
+  saveRecord(test);
+}
+
+
+/* =========================================================================
+   12. MANUAL OVERRIDE
+   ========================================================================= */
+
+function handleManualOverride(key, value) {
+
+  const test = getCurrentTestRecord();
+
+  const numericValue =
+    value === ""
+      ? null
+      : parseFloat(value);
+
+  test.manualOverrides[key] = numericValue;
+
+  test.effectiveOutputs[key] = numericValue;
+
+  test.provenance[key] = {
+    type: "MANUAL_OVERRIDE",
+    enteredAt: new Date().toISOString()
+  };
+
+  saveRecord(test);
+
+  processAndRender();
+}
+
+
+/* =========================================================================
+   13. DEPENDENCY INSPECTION
+   ========================================================================= */
+
+function getMissingDependencies(outputKey) {
+
+  if (!activeModule) {
+    return [];
+  }
+
+  const calculation =
+    activeModule.calculations?.find(
+      calc => calc.outputKey === outputKey
+    );
+
+  if (!calculation) {
+    return [];
+  }
+
+  const missing = [];
+
+  calculation.inputs.forEach(inputKey => {
+
+    if (typeof inputKey === "number") {
+      return;
     }
 
-    // Generic Action Resolver for Uncalculated Fields
-    function handleMissingDependencyClick(outputKey) {
-      const calculatedVal = getStoredValue(outputKey);
-      if (calculatedVal !== null && calculatedVal !== undefined) return;
+    const resolved = getResolvedValue(inputKey);
 
-      const missing = getMissingDependencies(outputKey);
-      if (missing.length === 0) return;
+    if (
+      resolved &&
+      resolved.value !== null &&
+      resolved.value !== undefined &&
+      !isNaN(resolved.value)
+    ) {
+      return;
+    }
 
-      // 1. Check if all missing dependencies are LOCAL inputs on current screen
-      const localMissing = missing.filter(dep => dep.type === 'LOCAL');
-      if (localMissing.length === missing.length) {
-        // Local Guard: Focus and highlight input boxes on screen
-        let focused = false;
-        localMissing.forEach(dep => {
-          const inputEl = document.querySelector(`input[data-field-id="${dep.key}"]`);
-          if (inputEl) {
-            inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            inputEl.classList.add('input-highlight');
-            if (!focused) { inputEl.focus(); focused = true; }
-            setTimeout(() => inputEl.classList.remove('input-highlight'), 2500);
-          }
-        });
-        return;
-      }
+    const localField =
+      activeModule.fields?.find(
+        field => field.id === inputKey
+      );
 
-      // 2. Handle EXTERNAL missing dependencies
-      const calcEl = document.querySelector(`[data-calc-field-id="${outputKey}"]`);
-      if (!calcEl) return;
-      const parentCard = calcEl.closest('.speed-card, .card');
+    const externalDependency =
+      activeModule.dependencies?.find(
+        dep => dep.valueKey === inputKey
+      );
 
-      const existingPrompt = parentCard.querySelector('.dependency-prompt');
-      if (existingPrompt) {
-        existingPrompt.remove();
-        return;
-      }
+    if (externalDependency) {
 
-      const promptBox = document.createElement('div');
-      promptBox.className = 'dependency-prompt';
-      promptBox.style.cssText = 'margin-top: 0.75rem; padding: 0.85rem; background: rgba(49, 130, 206, 0.12); border: 1px solid var(--accent); border-radius: 8px; width: 100%; box-sizing: border-box;';
+      missing.push({
+        key: inputKey,
+        label:
+          localField?.label ||
+          externalDependency.label ||
+          inputKey,
+        type: "DEPENDENCY",
+        dependency: externalDependency
+      });
 
-      let header = `
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
-          <span style="font-size:0.85rem; color:var(--text); font-weight:700;">⚠️ Uncalculated External Dependency</span>
-          <button onclick="this.closest('.dependency-prompt').remove()" 
-                  style="background:transparent; border:none; color:var(--muted); font-size:1.2rem; cursor:pointer; padding:0 0.3rem;">✕</button>
+      return;
+    }
+
+    missing.push({
+      key: inputKey,
+      label:
+        localField?.label ||
+        inputKey,
+      type: "LOCAL"
+    });
+  });
+
+  return missing;
+}
+
+
+/* =========================================================================
+   14. MISSING DEPENDENCY UI
+   ========================================================================= */
+
+function handleMissingDependencyClick(outputKey) {
+
+  const resolved = getResolvedValue(outputKey);
+
+  if (
+    resolved &&
+    resolved.value !== null &&
+    resolved.value !== undefined
+  ) {
+    return;
+  }
+
+  const missing =
+    getMissingDependencies(outputKey);
+
+  if (missing.length === 0) {
+    return;
+  }
+
+  const calcEl =
+    document.querySelector(
+      `[data-calc-field-id="${outputKey}"]`
+    );
+
+  if (!calcEl) {
+    return;
+  }
+
+  const parent =
+    calcEl.closest(".speed-card, .card");
+
+  if (!parent) {
+    return;
+  }
+
+  const old =
+    parent.querySelector(".dependency-box");
+
+  if (old) {
+    old.remove();
+    return;
+  }
+
+  const box =
+    document.createElement("div");
+
+  box.className = "dependency-box";
+
+  let html = `
+    <div class="dependency-title">
+      ⚠️ Missing Information
+    </div>
+  `;
+
+  missing.forEach(dep => {
+
+    if (dep.type === "LOCAL") {
+
+      html += `
+        <div class="dependency-detail">
+          This calculation requires
+          <strong>${dep.label}</strong>.
         </div>
       `;
 
-      let body = '';
-      missing.forEach(dep => {
-        if (dep.type === 'EXTERNAL') {
-          const isRegistered = dep.providerModuleId && ModuleRegistry.has(dep.providerModuleId);
+      return;
+    }
 
-          body += `
-            <div style="font-size:0.85rem; color:var(--muted); margin-bottom:0.5rem;">
-              This calculation requires <strong>${dep.label}</strong>:
-            </div>
-          `;
+    const providerId =
+      dep.dependency.providerModuleId;
 
-          if (isRegistered) {
-            const providerMod = ModuleRegistry.get(dep.providerModuleId);
-            body += `
-              <button class="btn-action" style="height:44px; font-size:0.9rem; margin-bottom:0.75rem; width:100%;" 
-                      onclick="selectModule('${dep.providerModuleId}')">
-                🔀 Launch ${providerMod.meta.title} →
-              </button>
-            `;
+    const provider =
+      providerId &&
+      ModuleRegistry.get(providerId);
+
+    html += `
+      <div class="dependency-detail">
+        Requires <strong>${dep.label}</strong>
+        from the
+        <strong>${provider?.meta?.title || providerId}</strong>
+        using the declared relationship:
+        <strong>${dep.dependency.relationship}</strong>.
+      </div>
+    `;
+
+    if (provider) {
+
+      html += `
+        <button
+          class="btn-action"
+          style="height:44px;font-size:0.9rem;width:100%;"
+          onclick="selectModule('${providerId}')">
+          Open ${provider.meta.title} →
+        </button>
+      `;
+    } else {
+
+      html += `
+        <div class="dependency-detail status-warning">
+          Provider module is not installed yet.
+          The system will not substitute another value automatically.
+        </div>
+      `;
+    }
+
+    html += `
+      <input
+        type="number"
+        inputmode="decimal"
+        placeholder="Manual ${dep.label}"
+        style="height:44px;font-size:0.95rem;margin-bottom:0.5rem;"
+        onchange="
+          handleManualOverride('${dep.key}', this.value);
+          this.closest('.dependency-box').remove();
+        ">
+    `;
+  });
+
+  box.innerHTML = html;
+
+  parent.appendChild(box);
+}
+
+
+/* =========================================================================
+   15. PATCH CALCULATED DISPLAY VALUES
+   ========================================================================= */
+
+function patchCalculatedFields() {
+
+  document
+    .querySelectorAll("[data-calc-field-id]")
+    .forEach(el => {
+
+      const key =
+        el.getAttribute("data-calc-field-id");
+
+      const resolved =
+        getResolvedValue(key);
+
+      el.textContent =
+        resolved &&
+        resolved.value !== null &&
+        resolved.value !== undefined
+          ? resolved.value
+          : "--";
+    });
+}
+
+
+/* =========================================================================
+   16. MODE / STEP CONTROL
+   ========================================================================= */
+
+function goToStep(index) {
+
+  commitCurrentInputs();
+
+  if (
+    activeModule &&
+    index >= 0 &&
+    index < activeModule.steps.length
+  ) {
+    currentStepIndex = index;
+    processAndRender();
+  }
+}
+
+
+function setMode(mode) {
+
+  commitCurrentInputs();
+
+  currentMode = mode;
+
+  document
+    .querySelectorAll(".mode-btn")
+    .forEach(btn => {
+
+      const label =
+        btn.textContent.toUpperCase();
+
+      btn.classList.toggle(
+        "active",
+        label.includes(mode.substring(0, 4))
+      );
+    });
+
+  processAndRender();
+}
+
+
+/* =========================================================================
+   17. RENDERING
+   ========================================================================= */
+
+function processAndRender() {
+
+  processRecord();
+
+  const viewport =
+    document.getElementById("app-viewport");
+
+  viewport.innerHTML = "";
+
+  if (!activeModule) {
+    viewport.innerHTML =
+      `<div class="card">No module selected.</div>`;
+    return;
+  }
+
+  if (currentMode === "INTERACTIVE") {
+    renderInteractiveMode(viewport);
+  }
+
+  else if (currentMode === "SPEED") {
+    renderSpeedMode(viewport);
+  }
+
+  else if (currentMode === "TRAINING") {
+    renderTrainingMode(viewport);
+  }
+}
+
+
+function renderInteractiveMode(container) {
+
+  const step =
+    activeModule.steps[currentStepIndex];
+
+  const card =
+    document.createElement("div");
+
+  card.className = "card";
+
+  const title =
+    document.createElement("div");
+
+  title.className = "card-title";
+
+  title.textContent =
+    `Step ${currentStepIndex + 1} of ${activeModule.steps.length}: ${step.title}`;
+
+  card.appendChild(title);
+
+  step.components.forEach(comp => {
+
+    switch (comp.type) {
+
+      case "instruction": {
+
+        const inst =
+          document.createElement("div");
+
+        inst.className = "instruction";
+        inst.textContent = comp.text;
+
+        card.appendChild(inst);
+
+        break;
+      }
+
+      case "field-input": {
+
+        const group =
+          document.createElement("div");
+
+        group.className = "field-group";
+
+        const label =
+          document.createElement("label");
+
+        label.textContent = comp.label;
+
+        const input =
+          document.createElement("input");
+
+        input.type = "number";
+        input.inputMode = "decimal";
+        input.step = "any";
+
+        input.setAttribute(
+          "data-field-id",
+          comp.fieldId
+        );
+
+        const value =
+          getLocalValue(comp.fieldId);
+
+        input.value =
+          value === null ? "" : value;
+
+        input.onchange = e =>
+          handleInputSilent(
+            comp.fieldId,
+            e.target.value
+          );
+
+        group.appendChild(label);
+        group.appendChild(input);
+
+        card.appendChild(group);
+
+        break;
+      }
+
+      case "formula": {
+
+        const box =
+          document.createElement("div");
+
+        box.className = "formula-box";
+        box.textContent = comp.expression;
+
+        card.appendChild(box);
+
+        break;
+      }
+
+      case "value-display": {
+
+        const resolved =
+          getResolvedValue(comp.fieldId);
+
+        const value =
+          resolved?.value ?? "--";
+
+        const box =
+          document.createElement("div");
+
+        box.className = "value-display";
+
+        box.innerHTML = `
+          <div
+            class="val"
+            data-calc-field-id="${comp.fieldId}">
+            ${value}
+            <span class="unit">${comp.unit || ""}</span>
+          </div>
+        `;
+
+        box.onclick =
+          () => handleMissingDependencyClick(
+            comp.fieldId
+          );
+
+        if (resolved?.source) {
+
+          const provenance =
+            document.createElement("div");
+
+          provenance.className =
+            "provenance";
+
+          if (
+            resolved.source.recordType ===
+            "TEST"
+          ) {
+
+            provenance.textContent =
+              `Source: ${resolved.source.moduleId} ` +
+              `(Test ${resolved.source.testId})`;
           }
 
-          // Parallel Manual Override Input Option
-          body += `
-            <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.75rem;">
-              <input type="number" inputmode="decimal" pattern="[0-9]*" placeholder="Enter manual ${dep.label}" 
-                     style="height:44px; font-size:0.95rem; flex:1;"
-                     onchange="handleManualOverride('${dep.key}', '${dep.providerModuleId}', this.value); promptBox.remove();" />
-            </div>
-          `;
+          else if (
+            resolved.source.recordType ===
+            "CURRENT_TEST"
+          ) {
+
+            provenance.textContent =
+              "Source: current test";
+          }
+
+          box.appendChild(provenance);
         }
-      });
 
-      promptBox.innerHTML = header + body;
-      parentCard.appendChild(promptBox);
-    }
+        card.appendChild(box);
 
-    function processAndRender() {
-      processRecord();
-      const viewport = document.getElementById('app-viewport');
-      viewport.innerHTML = '';
-
-      if (currentMode === 'INTERACTIVE') renderInteractiveMode(viewport);
-      else if (currentMode === 'SPEED') renderSpeedMode(viewport);
-      else if (currentMode === 'TRAINING') renderTrainingMode(viewport);
-    }
-
-    // =========================================================================
-    // 3. RENDERER ENGINE
-    // =========================================================================
-    function renderInteractiveMode(container) {
-      const step = activeModule.steps[currentStepIndex];
-      const card = document.createElement('div');
-      card.className = 'card';
-
-      const title = document.createElement('div');
-      title.className = 'card-title';
-      title.textContent = `Step ${currentStepIndex + 1} of ${activeModule.steps.length}: ${step.title}`;
-      card.appendChild(title);
-
-      step.components.forEach(comp => {
-        switch (comp.type) {
-          case 'instruction':
-            const inst = document.createElement('div');
-            inst.className = 'instruction';
-            inst.textContent = comp.text;
-            card.appendChild(inst);
-            break;
-
-          case 'field-input':
-            const group = document.createElement('div');
-            group.className = 'field-group';
-            group.innerHTML = `<label>${comp.label}</label>`;
-            const input = document.createElement('input');
-            input.type = 'number';
-            input.inputMode = 'decimal';
-            input.pattern = '[0-9]*';
-            input.step = '0.1';
-            input.setAttribute('data-field-id', comp.fieldId);
-            input.value = getStoredValue(comp.fieldId) ?? '';
-            input.onchange = (e) => handleInputSilent(comp.fieldId, e.target.value);
-            group.appendChild(input);
-            card.appendChild(group);
-            break;
-
-          case 'formula':
-            const fBox = document.createElement('div');
-            fBox.className = 'formula-box';
-            fBox.textContent = comp.expression;
-            card.appendChild(fBox);
-            break;
-
-          case 'value-display':
-            const vBox = document.createElement('div');
-            vBox.className = 'value-display';
-            const val = getStoredValue(comp.fieldId) ?? '--';
-            vBox.innerHTML = `
-              <div class="val" data-calc-field-id="${comp.fieldId}">${val}<span class="unit">${comp.unit}</span></div>
-            `;
-            vBox.onclick = () => handleMissingDependencyClick(comp.fieldId);
-            card.appendChild(vBox);
-            break;
-
-          case 'action-button':
-            const actBtn = document.createElement('button');
-            actBtn.className = 'btn-action';
-            actBtn.textContent = comp.label;
-            actBtn.onclick = () => {
-              commitCurrentInputs();
-              if (comp.action === 'JUMP_MODULE') {
-                selectModule(comp.targetModuleId);
-              } else if (comp.action === 'JUMP_STEP') {
-                goToStep(comp.targetStepIndex);
-              }
-            };
-            card.appendChild(actBtn);
-            break;
-        }
-      });
-
-      // Unified Dynamic Bottom Wizard Bar
-      const nav = document.createElement('div');
-      nav.className = 'wizard-nav';
-
-      if (currentStepIndex > 0) {
-        const prevBtn = document.createElement('button');
-        prevBtn.className = 'btn-secondary';
-        prevBtn.textContent = '← Back';
-        prevBtn.onclick = () => goToStep(currentStepIndex - 1);
-        nav.appendChild(prevBtn);
+        break;
       }
 
-      if (currentStepIndex < activeModule.steps.length - 1) {
-        const nextBtn = document.createElement('button');
-        nextBtn.className = 'btn-primary';
-        nextBtn.textContent = 'Next Step →';
-        nextBtn.onclick = () => goToStep(currentStepIndex + 1);
-        nav.appendChild(nextBtn);
-      } else {
-        const resetBtn = document.createElement('button');
-        resetBtn.className = 'btn-primary';
-        resetBtn.style.background = 'var(--success)';
-        resetBtn.textContent = '✓ Done (Start Over)';
-        resetBtn.onclick = () => goToStep(0);
-        nav.appendChild(resetBtn);
-      }
+      case "action-button": {
 
-      card.appendChild(nav);
-      container.appendChild(card);
-    }
+        const button =
+          document.createElement("button");
 
-    function renderSpeedMode(container) {
-      const header = document.createElement('div');
-      header.className = 'card-title';
-      header.style.marginBottom = '0.75rem';
-      header.textContent = `Speed Mode Field Card (${activeProjectId})`;
-      container.appendChild(header);
+        button.className = "btn-action";
+        button.textContent = comp.label;
 
-      activeModule.fields.forEach(f => {
-        const card = document.createElement('div');
-        card.className = 'speed-card';
-        let val = getStoredValue(f.id) ?? '';
+        button.onclick = () => {
 
-        if (f.computed) {
-          card.innerHTML = `
-            <div class="speed-card-main">
-              <div class="speed-info">
-                <div class="speed-label">${f.label}</div>
-                <div class="speed-type">Calculated (${f.unit || 'val'})</div>
-              </div>
-              <div class="speed-calc-val" data-calc-field-id="${f.id}" onclick="handleMissingDependencyClick('${f.id}')">${val !== '' ? val : '--'}</div>
-            </div>
-          `;
-        } else {
-          card.innerHTML = `
-            <div class="speed-card-main">
-              <div class="speed-info">
-                <div class="speed-label">${f.label}</div>
-                <div class="speed-type">Input (${f.unit || 'val'})</div>
-              </div>
-              <div class="speed-input-wrap">
-                <input type="number" inputmode="decimal" pattern="[0-9]*" 
-                       data-field-id="${f.id}"
-                       value="${val}" 
-                       onchange="handleInput('${f.id}', this.value)" />
-              </div>
-            </div>
-          `;
-        }
-        container.appendChild(card);
-      });
-    }
+          commitCurrentInputs();
 
-    function renderTrainingMode(container) {
-      renderInteractiveMode(container);
-      
-      const step = activeModule.steps[currentStepIndex];
-      if (step.trainingText) {
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.style.borderColor = 'var(--accent)';
-        card.innerHTML = `
-          <div class="card-title" style="color: var(--accent)">AASHTO Spec & Training Context</div>
-          <div class="instruction">${step.trainingText}</div>
-        `;
-        container.appendChild(card);
+          if (
+            comp.action === "JUMP_MODULE"
+          ) {
+            selectModule(comp.targetModuleId);
+          }
+
+          else if (
+            comp.action === "JUMP_STEP"
+          ) {
+            goToStep(comp.targetStepIndex);
+          }
+        };
+
+        card.appendChild(button);
+
+        break;
       }
     }
-  </script>
+  });
 
-  <!-- Load Registered Modules -->
-  <script src="modules/gmb-density.js"></script>
+  const nav =
+    document.createElement("div");
+
+  nav.className = "wizard-nav";
+
+  if (currentStepIndex > 0) {
+
+    const button =
+      document.createElement("button");
+
+    button.className =
+      "btn-secondary";
+
+    button.textContent =
+      "← Back";
+
+    button.onclick =
+      () => goToStep(
+        currentStepIndex - 1
+      );
+
+    nav.appendChild(button);
+  }
+
+  if (
+    currentStepIndex <
+    activeModule.steps.length - 1
+  ) {
+
+    const button =
+      document.createElement("button");
+
+    button.className =
+      "btn-primary";
+
+    button.textContent =
+      "Next Step →";
+
+    button.onclick =
+      () => goToStep(
+        currentStepIndex + 1
+      );
+
+    nav.appendChild(button);
+
+  } else {
+
+    const button =
+      document.createElement("button");
+
+    button.className =
+      "btn-primary";
+
+    button.style.background =
+      "var(--success)";
+
+    button.textContent =
+      "✓ Done";
+
+    button.onclick =
+      () => goToStep(0);
+
+    nav.appendChild(button);
+  }
+
+  card.appendChild(nav);
+  container.appendChild(card);
+}
+
+
+function renderSpeedMode(container) {
+
+  const title =
+    document.createElement("div");
+
+  title.className = "card-title";
+
+  title.textContent =
+    `Speed Mode (${activeProjectId})`;
+
+  container.appendChild(title);
+
+  activeModule.fields.forEach(field => {
+
+    const card =
+      document.createElement("div");
+
+    card.className = "speed-card";
+
+    const resolved =
+      getResolvedValue(field.id);
+
+    const value =
+      resolved?.value ?? "";
+
+    if (field.computed) {
+
+      card.innerHTML = `
+        <div class="speed-card-main">
+          <div class="speed-info">
+            <div class="speed-label">
+              ${field.label}
+            </div>
+            <div class="speed-type">
+              Calculated (${field.unit || "val"})
+            </div>
+          </div>
+
+          <div
+            class="speed-calc-val"
+            data-calc-field-id="${field.id}"
+            onclick="
+              handleMissingDependencyClick('${field.id}')
+            ">
+            ${value !== "" ? value : "--"}
+          </div>
+        </div>
+      `;
+
+    } else {
+
+      card.innerHTML = `
+        <div class="speed-card-main">
+          <div class="speed-info">
+            <div class="speed-label">
+              ${field.label}
+            </div>
+            <div class="speed-type">
+              Input (${field.unit || "val"})
+            </div>
+          </div>
+
+          <div class="speed-input-wrap">
+            <input
+              type="number"
+              inputmode="decimal"
+              step="any"
+              data-field-id="${field.id}"
+              value="${value}"
+              onchange="
+                handleInput('${field.id}', this.value)
+              ">
+          </div>
+        </div>
+      `;
+    }
+
+    container.appendChild(card);
+  });
+}
+
+
+function renderTrainingMode(container) {
+
+  renderInteractiveMode(container);
+
+  const step =
+    activeModule.steps[currentStepIndex];
+
+  if (step.trainingText) {
+
+    const card =
+      document.createElement("div");
+
+    card.className = "card";
+
+    card.style.borderColor =
+      "var(--accent)";
+
+    card.innerHTML = `
+      <div
+        class="card-title"
+        style="color:var(--accent)">
+        Training Context
+      </div>
+
+      <div class="instruction">
+        ${step.trainingText}
+      </div>
+    `;
+
+    container.appendChild(card);
+  }
+}
+
+
+/* =========================================================================
+   18. PROJECT ID
+   ========================================================================= */
+
+function updateProjectId(value) {
+
+  const trimmed =
+    String(value || "").trim();
+
+  if (!trimmed) {
+    return;
+  }
+
+  commitCurrentInputs();
+
+  activeProjectId = trimmed;
+
+  getProjectNode(activeProjectId);
+
+  processAndRender();
+  renderWorkdayNavigation();
+}
+
+
+/* =========================================================================
+   19. INITIALIZE
+   ========================================================================= */
+
+getProjectNode(activeProjectId);
+</script>
+
+<script src="modules/gmb-density.js"></script>
+
 </body>
 </html>
