@@ -2086,31 +2086,32 @@ function getLocalValue(
 function getResolvedValue(
   key
 ) {
+  const test = getCurrentTestRecord();
 
-  const local =
-    getLocalValue(key);
-
-  if (
-    local !== null &&
-    local !== undefined
-  ) {
-
-    return {
-
-      value: local,
-
-      source: {
-
-        recordType:
-          "CURRENT_TEST",
-
-        testId:
-          getCurrentTestRecord()
-            .testId
-      }
-    };
+  // 1. HIGHEST PRIORITY: Check if there is an explicit manual override or local input/output set in the current test.
+  // This ensures manual overrides for external/dependency fields (like manual Rice Gmm) are respected by the engine.
+  if (test) {
+    if (test.effectiveOutputs[key] !== undefined && test.effectiveOutputs[key] !== null) {
+      return {
+        value: test.effectiveOutputs[key],
+        source: { recordType: "EFFECTIVE_OUTPUT", testId: test.testId }
+      };
+    }
+    if (test.manualOverrides[key] !== undefined && test.manualOverrides[key] !== null) {
+      return {
+        value: test.manualOverrides[key],
+        source: { recordType: "MANUAL_OVERRIDE", testId: test.testId }
+      };
+    }
+    if (test.inputs[key] !== undefined && test.inputs[key] !== null) {
+      return {
+        value: test.inputs[key],
+        source: { recordType: "LOCAL_INPUT", testId: test.testId }
+      };
+    }
   }
 
+  // 2. FALLBACK: Check declared dependencies if no local override exists
   if (
     !activeModule ||
     !activeModule.dependencies
@@ -2478,30 +2479,32 @@ function handleManualOverride(
     numericValue === null ||
     isNaN(numericValue)
   ) {
+    delete test.manualOverrides[key];
+    delete test.effectiveOutputs[key];
+    delete test.provenance[key];
+  } else {
+    test.manualOverrides[key] =
+      numericValue;
 
-    return;
+    test.effectiveOutputs[key] =
+      numericValue;
+
+    test.provenance[key] = {
+
+      type:
+        "MANUAL_OVERRIDE",
+
+      enteredAt:
+        new Date().toISOString(),
+
+      source:
+        "USER_ENTERED"
+    };
   }
-
-  test.manualOverrides[key] =
-    numericValue;
-
-  test.effectiveOutputs[key] =
-    numericValue;
-
-  test.provenance[key] = {
-
-    type:
-      "MANUAL_OVERRIDE",
-
-    enteredAt:
-      new Date().toISOString(),
-
-    source:
-      "USER_ENTERED"
-  };
 
   saveRecord(test);
 
+  // Force the engine to process calculations and update UI immediately
   processAndRender();
 }
 
@@ -3408,11 +3411,17 @@ function renderInteractiveMode(
             else if (
               resolved.source
                 .recordType ===
-              "CURRENT_TEST"
+              "CURRENT_TEST" ||
+              resolved.source
+                .recordType ===
+              "MANUAL_OVERRIDE" ||
+              resolved.source
+                .recordType ===
+              "EFFECTIVE_OUTPUT"
             ) {
 
               provenance.textContent =
-                "Source: current test";
+                "Source: manual entry / local";
             }
 
             box.appendChild(
