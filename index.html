@@ -66,7 +66,8 @@
       width: 100%;
     }
 
-    select.mobile-nav {
+    select.mobile-nav,
+    select.navigation-perspective {
       width: 100%;
       height: 48px;
       background: var(--input-bg);
@@ -77,6 +78,27 @@
       font-size: 1rem;
       font-weight: 600;
       outline: none;
+    }
+
+    .navigation-controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .navigation-controls select {
+      flex: 1;
+    }
+
+    .nav-toggle {
+      width: 48px;
+      min-width: 48px;
+      height: 48px;
+      background: var(--input-bg);
+      color: var(--text);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      font-size: 1.15rem;
+      cursor: pointer;
     }
 
     .toolbar {
@@ -134,6 +156,102 @@
       color: white;
     }
 
+    /* ---------------------------------------------------------------------
+       NAVIGATION TREE
+       --------------------------------------------------------------------- */
+
+    .navigation-panel {
+      display: none;
+      background: #111318;
+      border-bottom: 1px solid var(--panel-border);
+      padding: 0.75rem 1rem;
+    }
+
+    .navigation-panel.open {
+      display: block;
+    }
+
+    .navigation-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.6rem;
+    }
+
+    .navigation-panel-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .navigation-panel-subtitle {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .navigation-tree {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      max-height: 50vh;
+      overflow-y: auto;
+    }
+
+    .nav-tree-group {
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .nav-tree-group-title {
+      padding: 0.6rem 0.7rem;
+      background: var(--panel);
+      color: var(--text);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .nav-tree-item {
+      width: 100%;
+      border: none;
+      border-top: 1px solid var(--panel-border);
+      background: var(--input-bg);
+      color: var(--muted);
+      text-align: left;
+      padding: 0.65rem 0.75rem;
+      cursor: pointer;
+      font-size: 0.82rem;
+    }
+
+    .nav-tree-item:hover,
+    .nav-tree-item:active {
+      background: rgba(49, 130, 206, 0.12);
+      color: var(--text);
+    }
+
+    .nav-tree-item.active {
+      color: var(--text);
+      border-left: 3px solid var(--accent);
+    }
+
+    .nav-tree-indent-1 {
+      padding-left: 1.5rem;
+    }
+
+    .nav-tree-indent-2 {
+      padding-left: 2.25rem;
+    }
+
+    .nav-empty {
+      color: var(--muted);
+      font-size: 0.8rem;
+      padding: 0.6rem;
+    }
+
+    /* ---------------------------------------------------------------------
+       WORKDAY
+       --------------------------------------------------------------------- */
+
     .workday-bar {
       display: flex;
       gap: 0.5rem;
@@ -160,6 +278,10 @@
       color: var(--text);
       background: rgba(49, 130, 206, 0.15);
     }
+
+    /* ---------------------------------------------------------------------
+       MAIN CONTENT
+       --------------------------------------------------------------------- */
 
     main {
       flex: 1;
@@ -294,6 +416,24 @@
       margin-bottom: 0.65rem;
     }
 
+    .dependency-path {
+      font-family: monospace;
+      font-size: 0.76rem;
+      color: var(--text);
+      background: var(--input-bg);
+      padding: 0.55rem;
+      border-radius: 6px;
+      margin-bottom: 0.7rem;
+      overflow-x: auto;
+    }
+
+    .dependency-choice {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+
     .wizard-nav {
       display: flex;
       gap: 0.75rem;
@@ -402,26 +542,79 @@
 <header>
   <div class="top-bar">
     <div class="logo">QC FIELD ENGINE</div>
+
     <div style="font-size:0.75rem;color:var(--muted);background:var(--input-bg);padding:0.2rem 0.5rem;border-radius:4px;">
       OFFLINE READY
     </div>
   </div>
 
+  <div class="navigation-controls">
+    <select
+      id="navigation-perspective"
+      class="navigation-perspective"
+      onchange="setNavigationPerspective(this.value)">
+    </select>
+
+    <button
+      class="nav-toggle"
+      type="button"
+      onclick="toggleNavigationPanel()"
+      aria-label="Open navigation">
+      ☰
+    </button>
+  </div>
+
   <div class="module-select-wrapper">
-    <select id="mobile-module-select" class="mobile-nav" onchange="selectModule(this.value)"></select>
+    <select
+      id="mobile-module-select"
+      class="mobile-nav"
+      onchange="selectModule(this.value)">
+    </select>
   </div>
 </header>
+
+<div class="navigation-panel" id="navigation-panel">
+  <div class="navigation-panel-header">
+    <div>
+      <div class="navigation-panel-title">Navigation</div>
+      <div class="navigation-panel-subtitle" id="navigation-panel-subtitle">
+        Current project
+      </div>
+    </div>
+  </div>
+
+  <div class="navigation-tree" id="navigation-tree"></div>
+</div>
 
 <div class="toolbar">
   <div class="project-meta">
     <span>ACTIVE JOB #:</span>
-    <input type="text" id="project-id-input" value="JOB-2173" onchange="updateProjectId(this.value)">
+
+    <input
+      type="text"
+      id="project-id-input"
+      value="JOB-2173"
+      onchange="updateProjectId(this.value)">
   </div>
 
   <div class="mode-selector">
-    <button class="mode-btn active" onclick="setMode('INTERACTIVE')">Step Wizard</button>
-    <button class="mode-btn" onclick="setMode('SPEED')">Speed Sheet</button>
-    <button class="mode-btn" onclick="setMode('TRAINING')">Training</button>
+    <button
+      class="mode-btn active"
+      onclick="setMode('INTERACTIVE')">
+      Step Wizard
+    </button>
+
+    <button
+      class="mode-btn"
+      onclick="setMode('SPEED')">
+      Speed Sheet
+    </button>
+
+    <button
+      class="mode-btn"
+      onclick="setMode('TRAINING')">
+      Training
+    </button>
   </div>
 </div>
 
@@ -430,6 +623,7 @@
 <main>
   <div class="container" id="app-viewport"></div>
 </main>
+
 
 <script>
 /* =========================================================================
@@ -443,20 +637,11 @@ let activeProjectId = "JOB-2173";
 let currentMode = "INTERACTIVE";
 let currentStepIndex = 0;
 
+let activeNavigationPerspective = "default";
+
 
 /* =========================================================================
    2. DATA MODEL
-   =========================================================================
-   
-   The application distinguishes:
-   
-   Project
-      ├── Material Samples
-      ├── Cores
-      └── Tests
-   
-   A TestRecord belongs to a parent object and may produce values.
-   Tests do not randomly search unrelated records.
    ========================================================================= */
 
 const ProjectStore = {
@@ -465,11 +650,16 @@ const ProjectStore = {
 
 
 function createProject(projectId) {
+
+  const now = new Date().toISOString();
+
   return {
     recordType: "PROJECT",
+
     projectId,
-    createdAt: new Date().toISOString(),
-    modifiedAt: new Date().toISOString(),
+
+    createdAt: now,
+    modifiedAt: now,
 
     mixDesigns: {},
     materialSamples: {},
@@ -482,45 +672,62 @@ function createProject(projectId) {
 
 
 function createMaterialSample(sampleId, projectId) {
+
+  const now = new Date().toISOString();
+
   return {
     recordType: "MATERIAL_SAMPLE",
+
     sampleId,
     projectId,
 
-    createdAt: new Date().toISOString(),
-    modifiedAt: new Date().toISOString(),
+    createdAt: now,
+    modifiedAt: now,
 
     metadata: {},
+
     testRefs: []
   };
 }
 
 
 function createCore(coreId, projectId) {
+
+  const now = new Date().toISOString();
+
   return {
     recordType: "CORE",
+
     coreId,
     projectId,
 
-    createdAt: new Date().toISOString(),
-    modifiedAt: new Date().toISOString(),
+    createdAt: now,
+    modifiedAt: now,
 
     metadata: {},
+
     testRefs: []
   };
 }
 
 
 function createTestRecord(testId, moduleId, parentRef) {
+
+  const now = new Date().toISOString();
+
   return {
     recordType: "TEST",
+
     testId,
     moduleId,
 
     parentRef,
 
-    createdAt: new Date().toISOString(),
-    modifiedAt: new Date().toISOString(),
+    createdAt: now,
+    modifiedAt: now,
+
+    obtainedAt: null,
+    testedAt: null,
 
     inputs: {},
     calculatedOutputs: {},
@@ -528,14 +735,19 @@ function createTestRecord(testId, moduleId, parentRef) {
     effectiveOutputs: {},
 
     calculationSteps: [],
-    provenance: {}
+
+    provenance: {},
+
+    relationships: {}
   };
 }
 
 
 function getProjectNode(projectId = activeProjectId) {
+
   if (!ProjectStore.projects[projectId]) {
-    ProjectStore.projects[projectId] = createProject(projectId);
+    ProjectStore.projects[projectId] =
+      createProject(projectId);
   }
 
   return ProjectStore.projects[projectId];
@@ -543,19 +755,33 @@ function getProjectNode(projectId = activeProjectId) {
 
 
 function getCurrentTestRecord() {
-  if (!activeModule) return null;
 
-  const project = getProjectNode();
+  if (!activeModule) {
+    return null;
+  }
+
+  const project =
+    getProjectNode();
+
+  /*
+   * This prototype still maintains one active test record per module.
+   *
+   * The record itself is deliberately separate from the module definition,
+   * so multiple test records can be introduced later without changing the
+   * processing/navigation architecture.
+   */
 
   if (!project.tests[activeModule.meta.id]) {
-    project.tests[activeModule.meta.id] = createTestRecord(
-      `${activeModule.meta.id}-${project.projectId}`,
-      activeModule.meta.id,
-      {
-        recordType: "PROJECT",
-        projectId: project.projectId
-      }
-    );
+
+    project.tests[activeModule.meta.id] =
+      createTestRecord(
+        `${activeModule.meta.id}-${project.projectId}`,
+        activeModule.meta.id,
+        {
+          recordType: "PROJECT",
+          projectId: project.projectId
+        }
+      );
   }
 
   return project.tests[activeModule.meta.id];
@@ -567,62 +793,878 @@ function getCurrentTestRecord() {
    ========================================================================= */
 
 function saveRecord(record) {
-  record.modifiedAt = new Date().toISOString();
+
+  record.modifiedAt =
+    new Date().toISOString();
+
   return record;
 }
 
 
 /* =========================================================================
-   4. MODULE REGISTRATION
+   4. NAVIGATION SYSTEM
+   =========================================================================
+   
+   Navigation is based on logical identities, not DOM elements.
+
+   Logical target:
+
+      module
+         ↓
+      test
+         ↓
+      step
+         ↓
+      field
+
+   The renderer registers the temporary DOM representation of that logical
+   target. This means a field remains navigable after the page is re-rendered
+   or the display mode changes.
+   ========================================================================= */
+
+const NavigationRegistry = {
+
+  renderedFields: new Map(),
+
+  clearRenderedFields() {
+    this.renderedFields.clear();
+  },
+
+  registerField(target) {
+
+    if (!target || !target.fieldId) {
+      return;
+    }
+
+    const key =
+      this.makeFieldKey(
+        target.moduleId,
+        target.testId,
+        target.fieldId
+      );
+
+    this.renderedFields.set(key, target);
+  },
+
+  makeFieldKey(moduleId, testId, fieldId) {
+
+    return [
+      moduleId || "",
+      testId || "",
+      fieldId || ""
+    ].join("::");
+  },
+
+  findRenderedField(moduleId, testId, fieldId) {
+
+    const exact =
+      this.renderedFields.get(
+        this.makeFieldKey(
+          moduleId,
+          testId,
+          fieldId
+        )
+      );
+
+    if (exact) {
+      return exact;
+    }
+
+    /*
+     * If the target test is not explicitly known, fall back to the currently
+     * active test for that module.
+     */
+
+    const current =
+      getCurrentTestRecord();
+
+    if (
+      current &&
+      current.moduleId === moduleId
+    ) {
+
+      return this.renderedFields.get(
+        this.makeFieldKey(
+          moduleId,
+          current.testId,
+          fieldId
+        )
+      );
+    }
+
+    return null;
+  }
+};
+
+
+/* =========================================================================
+   5. NAVIGATION PERSPECTIVES
+   =========================================================================
+   
+   Perspectives are presentation rules.
+
+   They do not create another database.
+
+   They tell the navigation system how to organize the same underlying
+   modules/records.
+
+   Additional perspectives can be added later without changing the data
+   model.
+   ========================================================================= */
+
+const NavigationPerspectives = new Map();
+
+
+function registerNavigationPerspective(perspective) {
+
+  if (
+    !perspective ||
+    !perspective.id ||
+    typeof perspective.build !== "function"
+  ) {
+    throw new Error(
+      "Invalid navigation perspective."
+    );
+  }
+
+  NavigationPerspectives.set(
+    perspective.id,
+    perspective
+  );
+}
+
+
+registerNavigationPerspective({
+
+  id: "default",
+
+  title: "Default",
+
+  build() {
+
+    return Array.from(
+      ModuleRegistry.values()
+    ).map(module => ({
+      type: "GROUP",
+      id: `module-${module.meta.id}`,
+      label: module.meta.title,
+
+      children: [
+        {
+          type: "MODULE",
+          moduleId: module.meta.id,
+          label:
+            module.meta.shortTitle ||
+            module.meta.title
+        }
+      ]
+    }));
+  }
+
+});
+
+
+registerNavigationPerspective({
+
+  id: "roadway-tech",
+
+  title: "Roadway Tech",
+
+  build() {
+
+    const groups = [];
+
+    const visited = new Set();
+
+    ModuleRegistry.forEach(module => {
+
+      if (visited.has(module.meta.id)) {
+        return;
+      }
+
+      const chain =
+        getWorkdayChain(module.meta.id);
+
+      if (chain.length === 0) {
+        return;
+      }
+
+      chain.forEach(id =>
+        visited.add(id)
+      );
+
+      groups.push({
+
+        type: "GROUP",
+
+        id: `roadway-${module.meta.id}`,
+
+        label:
+          "Roadway Procedure",
+
+        children:
+          chain.map(id => {
+
+            const mod =
+              ModuleRegistry.get(id);
+
+            return {
+              type: "MODULE",
+              moduleId: id,
+              label:
+                mod.meta.shortTitle ||
+                mod.meta.title
+            };
+          })
+      });
+    });
+
+    return groups;
+  }
+
+});
+
+
+registerNavigationPerspective({
+
+  id: "lab-tech",
+
+  title: "Lab Tech",
+
+  build() {
+
+    const groups = [];
+
+    ModuleRegistry.forEach(module => {
+
+      const record =
+        getTestRecordForModule(
+          module.meta.id
+        );
+
+      const children = [];
+
+      if (record) {
+
+        module.fields
+          ?.filter(field =>
+            field.computed ||
+            field.external
+          )
+          .forEach(field => {
+
+            children.push({
+
+              type: "FIELD",
+
+              moduleId:
+                module.meta.id,
+
+              testId:
+                record.testId,
+
+              fieldId:
+                field.id,
+
+              label:
+                field.label
+            });
+          });
+      }
+
+      groups.push({
+
+        type: "GROUP",
+
+        id:
+          `lab-${module.meta.id}`,
+
+        label:
+          module.meta.shortTitle ||
+          module.meta.title,
+
+        children: [
+          {
+            type: "MODULE",
+            moduleId:
+              module.meta.id,
+            label:
+              module.meta.title
+          },
+
+          ...children
+        ]
+      });
+    });
+
+    return groups;
+  }
+
+});
+
+
+registerNavigationPerspective({
+
+  id: "workday",
+
+  title: "Workday",
+
+  build() {
+
+    if (!activeModule) {
+      return [];
+    }
+
+    const chain =
+      getWorkdayChain(
+        activeModule.meta.id
+      );
+
+    return [
+
+      {
+        type: "GROUP",
+
+        id: "workday-chain",
+
+        label: "Procedure Sequence",
+
+        children:
+          chain.map(moduleId => {
+
+            const module =
+              ModuleRegistry.get(
+                moduleId
+              );
+
+            return {
+              type: "MODULE",
+              moduleId,
+              label:
+                module.meta.shortTitle ||
+                module.meta.title
+            };
+          })
+      }
+
+    ];
+  }
+
+});
+
+
+function getTestRecordForModule(moduleId) {
+
+  const project =
+    getProjectNode();
+
+  return project.tests?.[moduleId] || null;
+}
+
+
+/* =========================================================================
+   6. NAVIGATION RENDERING
+   ========================================================================= */
+
+function setNavigationPerspective(perspectiveId) {
+
+  if (
+    !NavigationPerspectives.has(
+      perspectiveId
+    )
+  ) {
+    return;
+  }
+
+  activeNavigationPerspective =
+    perspectiveId;
+
+  renderNavigationPerspective();
+}
+
+
+function renderNavigationPerspective() {
+
+  const select =
+    document.getElementById(
+      "navigation-perspective"
+    );
+
+  const tree =
+    document.getElementById(
+      "navigation-tree"
+    );
+
+  if (!select || !tree) {
+    return;
+  }
+
+  select.innerHTML = "";
+
+  NavigationPerspectives.forEach(
+    perspective => {
+
+      const option =
+        document.createElement(
+          "option"
+        );
+
+      option.value =
+        perspective.id;
+
+      option.textContent =
+        perspective.title;
+
+      option.selected =
+        perspective.id ===
+        activeNavigationPerspective;
+
+      select.appendChild(option);
+    }
+  );
+
+  const perspective =
+    NavigationPerspectives.get(
+      activeNavigationPerspective
+    );
+
+  tree.innerHTML = "";
+
+  if (!perspective) {
+    return;
+  }
+
+  const groups =
+    perspective.build();
+
+  if (!groups.length) {
+
+    tree.innerHTML =
+      `<div class="nav-empty">
+        No navigation items are currently available.
+      </div>`;
+
+    return;
+  }
+
+  groups.forEach(group => {
+
+    const groupBox =
+      document.createElement(
+        "div"
+      );
+
+    groupBox.className =
+      "nav-tree-group";
+
+    const title =
+      document.createElement(
+        "div"
+      );
+
+    title.className =
+      "nav-tree-group-title";
+
+    title.textContent =
+      group.label;
+
+    groupBox.appendChild(title);
+
+    (group.children || [])
+      .forEach(item => {
+
+        const button =
+          document.createElement(
+            "button"
+          );
+
+        button.className =
+          "nav-tree-item";
+
+        if (
+          item.moduleId ===
+          activeModule?.meta?.id
+        ) {
+          button.classList.add(
+            "active"
+          );
+        }
+
+        button.textContent =
+          item.label;
+
+        button.onclick =
+          () => handleNavigationItem(
+            item
+          );
+
+        groupBox.appendChild(
+          button
+        );
+
+        if (
+          item.children &&
+          item.children.length
+        ) {
+
+          item.children.forEach(
+            child => {
+
+              const childButton =
+                document.createElement(
+                  "button"
+                );
+
+              childButton.className =
+                "nav-tree-item nav-tree-indent-1";
+
+              childButton.textContent =
+                child.label;
+
+              childButton.onclick =
+                () =>
+                  handleNavigationItem(
+                    child
+                  );
+
+              groupBox.appendChild(
+                childButton
+              );
+            }
+          );
+        }
+      });
+
+    tree.appendChild(
+      groupBox
+    );
+  });
+
+  const subtitle =
+    document.getElementById(
+      "navigation-panel-subtitle"
+    );
+
+  if (subtitle) {
+
+    subtitle.textContent =
+      `${perspective.title} • ${activeProjectId}`;
+  }
+}
+
+
+function toggleNavigationPanel() {
+
+  const panel =
+    document.getElementById(
+      "navigation-panel"
+    );
+
+  panel.classList.toggle(
+    "open"
+  );
+}
+
+
+function handleNavigationItem(item) {
+
+  if (!item) {
+    return;
+  }
+
+  if (item.type === "MODULE") {
+
+    selectModule(
+      item.moduleId
+    );
+
+    return;
+  }
+
+  if (item.type === "FIELD") {
+
+    navigateToField(
+      item.fieldId,
+      item.moduleId,
+      item.testId
+    );
+  }
+}
+
+
+/* =========================================================================
+   7. LOGICAL FIELD NAVIGATION
+   ========================================================================= */
+
+function findStepForField(module, fieldId) {
+
+  if (!module?.steps) {
+    return -1;
+  }
+
+  for (
+    let i = 0;
+    i < module.steps.length;
+    i++
+  ) {
+
+    const step =
+      module.steps[i];
+
+    const found =
+      step.components?.some(
+        component =>
+          component.fieldId ===
+          fieldId
+      );
+
+    if (found) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+
+function navigateToField(
+  fieldId,
+  moduleId = activeModule?.meta?.id,
+  testId = null
+) {
+
+  if (!moduleId) {
+    return false;
+  }
+
+  const module =
+    ModuleRegistry.get(
+      moduleId
+    );
+
+  if (!module) {
+    return false;
+  }
+
+  /*
+   * First navigate to the module.
+   */
+
+  if (
+    !activeModule ||
+    activeModule.meta.id !== moduleId
+  ) {
+
+    selectModule(
+      moduleId
+    );
+  }
+
+  const stepIndex =
+    findStepForField(
+      module,
+      fieldId
+    );
+
+  /*
+   * If the field exists inside a wizard step, go there.
+   */
+
+  if (
+    stepIndex >= 0 &&
+    currentMode !== "SPEED"
+  ) {
+
+    currentStepIndex =
+      stepIndex;
+
+    processAndRender();
+  }
+
+  /*
+   * Give the renderer one turn to create the target DOM.
+   */
+
+  requestAnimationFrame(
+    () => {
+
+      const currentTest =
+        getCurrentTestRecord();
+
+      const rendered =
+        NavigationRegistry
+          .findRenderedField(
+            moduleId,
+            testId ||
+              currentTest?.testId,
+            fieldId
+          );
+
+      if (
+        rendered?.element
+      ) {
+
+        focusNavigationElement(
+          rendered.element
+        );
+
+        return;
+      }
+
+      /*
+       * Speed mode or a field not represented by the current step:
+       * find the logical DOM representation directly.
+       */
+
+      const element =
+        document.querySelector(
+          `[data-field-id="${fieldId}"],` +
+          `[data-calc-field-id="${fieldId}"]`
+        );
+
+      if (element) {
+
+        focusNavigationElement(
+          element
+        );
+      }
+    }
+  );
+
+  return true;
+}
+
+
+function focusNavigationElement(
+  element
+) {
+
+  element.scrollIntoView({
+    behavior: "smooth",
+    block: "center"
+  });
+
+  element.classList.add(
+    "input-highlight"
+  );
+
+  if (
+    typeof element.focus ===
+    "function"
+  ) {
+    element.focus();
+  }
+
+  setTimeout(
+    () =>
+      element.classList.remove(
+        "input-highlight"
+      ),
+    2500
+  );
+}
+
+
+/* =========================================================================
+   8. MODULE REGISTRATION
    ========================================================================= */
 
 function registerModule(moduleObj) {
-  if (!moduleObj || !moduleObj.meta || !moduleObj.meta.id) {
-    throw new Error("Cannot register module without meta.id");
+
+  if (
+    !moduleObj ||
+    !moduleObj.meta ||
+    !moduleObj.meta.id
+  ) {
+    throw new Error(
+      "Cannot register module without meta.id"
+    );
   }
 
-  ModuleRegistry.set(moduleObj.meta.id, moduleObj);
+  ModuleRegistry.set(
+    moduleObj.meta.id,
+    moduleObj
+  );
 
   renderNavigation();
+  renderNavigationPerspective();
   renderWorkdayNavigation();
 
   if (!activeModule) {
-    selectModule(moduleObj.meta.id);
+
+    selectModule(
+      moduleObj.meta.id
+    );
   }
 }
 
 
 function renderNavigation() {
-  const select = document.getElementById("mobile-module-select");
 
-  select.innerHTML = "";
+  const select =
+    document.getElementById(
+      "mobile-module-select"
+    );
 
-  if (ModuleRegistry.size === 0) {
-    select.innerHTML = "<option>No Modules Registered</option>";
+  if (!select) {
     return;
   }
 
-  ModuleRegistry.forEach(mod => {
-    const option = document.createElement("option");
+  select.innerHTML = "";
 
-    option.value = mod.meta.id;
-    option.textContent = `📋 ${mod.meta.title}`;
+  if (
+    ModuleRegistry.size === 0
+  ) {
 
-    if (activeModule && activeModule.meta.id === mod.meta.id) {
-      option.selected = true;
+    select.innerHTML =
+      "<option>No Modules Registered</option>";
+
+    return;
+  }
+
+  ModuleRegistry.forEach(
+    module => {
+
+      const option =
+        document.createElement(
+          "option"
+        );
+
+      option.value =
+        module.meta.id;
+
+      option.textContent =
+        `📋 ${module.meta.title}`;
+
+      if (
+        activeModule &&
+        activeModule.meta.id ===
+          module.meta.id
+      ) {
+        option.selected = true;
+      }
+
+      select.appendChild(
+        option
+      );
     }
-
-    select.appendChild(option);
-  });
+  );
 }
 
 
 /* =========================================================================
-   5. PREQUEL / SEQUEL WORKDAY NAVIGATION
+   9. PREQUEL / SEQUEL WORKDAY NAVIGATION
    ========================================================================= */
 
-function getWorkdayChain(startModuleId) {
-  if (!ModuleRegistry.has(startModuleId)) {
+function getWorkdayChain(
+  startModuleId
+) {
+
+  if (
+    !ModuleRegistry.has(
+      startModuleId
+    )
+  ) {
     return [];
   }
 
@@ -630,104 +1672,194 @@ function getWorkdayChain(startModuleId) {
   const visited = new Set();
 
   function addModule(moduleId) {
-    if (visited.has(moduleId)) return;
-    if (!ModuleRegistry.has(moduleId)) return;
+
+    if (visited.has(moduleId)) {
+      return;
+    }
+
+    if (
+      !ModuleRegistry.has(
+        moduleId
+      )
+    ) {
+      return;
+    }
 
     visited.add(moduleId);
 
-    const module = ModuleRegistry.get(moduleId);
+    const module =
+      ModuleRegistry.get(
+        moduleId
+      );
 
-    const prequels = module.meta.prequels || [];
+    const prequels =
+      module.meta.prequels ||
+      [];
 
-    prequels.forEach(addModule);
+    prequels.forEach(
+      addModule
+    );
 
     chain.push(moduleId);
 
-    const sequels = module.meta.sequels || [];
+    const sequels =
+      module.meta.sequels ||
+      [];
 
-    sequels.forEach(sequelId => {
-      if (!visited.has(sequelId)) {
-        addModule(sequelId);
-      }
-    });
+    sequels.forEach(
+      addModule
+    );
   }
 
-  addModule(startModuleId);
+  addModule(
+    startModuleId
+  );
 
   return chain;
 }
 
 
 function renderWorkdayNavigation() {
-  const bar = document.getElementById("workday-navigation");
 
-  if (!bar) return;
+  const bar =
+    document.getElementById(
+      "workday-navigation"
+    );
+
+  if (!bar) {
+    return;
+  }
 
   bar.innerHTML = "";
 
-  if (!activeModule) return;
+  if (!activeModule) {
+    return;
+  }
 
-  const chain = getWorkdayChain(activeModule.meta.id);
+  const chain =
+    getWorkdayChain(
+      activeModule.meta.id
+    );
 
-  chain.forEach(moduleId => {
-    const module = ModuleRegistry.get(moduleId);
+  chain.forEach(
+    moduleId => {
 
-    const button = document.createElement("button");
+      const module =
+        ModuleRegistry.get(
+          moduleId
+        );
 
-    button.className = "workday-item";
+      const button =
+        document.createElement(
+          "button"
+        );
 
-    if (moduleId === activeModule.meta.id) {
-      button.classList.add("active");
+      button.className =
+        "workday-item";
+
+      if (
+        moduleId ===
+        activeModule.meta.id
+      ) {
+
+        button.classList.add(
+          "active"
+        );
+      }
+
+      button.textContent =
+        module.meta.shortTitle ||
+        module.meta.title;
+
+      button.onclick =
+        () =>
+          selectModule(
+            moduleId
+          );
+
+      bar.appendChild(
+        button
+      );
     }
-
-    button.textContent = module.meta.shortTitle || module.meta.title;
-
-    button.onclick = () => selectModule(moduleId);
-
-    bar.appendChild(button);
-  });
+  );
 }
 
 
 /* =========================================================================
-   6. MODULE SELECTION
+   10. MODULE SELECTION
    ========================================================================= */
 
-function selectModule(moduleId) {
-  if (!ModuleRegistry.has(moduleId)) {
-    alert(`Module ${moduleId} is not registered.`);
+function selectModule(
+  moduleId
+) {
+
+  if (
+    !ModuleRegistry.has(
+      moduleId
+    )
+  ) {
+
+    alert(
+      `Module ${moduleId} is not registered.`
+    );
+
     return;
   }
 
   commitCurrentInputs();
 
-  activeModule = ModuleRegistry.get(moduleId);
+  activeModule =
+    ModuleRegistry.get(
+      moduleId
+    );
+
   currentStepIndex = 0;
 
   renderNavigation();
+  renderNavigationPerspective();
   renderWorkdayNavigation();
+
   processAndRender();
 }
 
 
 /* =========================================================================
-   7. INPUT COMMIT
+   11. INPUT COMMIT
    ========================================================================= */
 
 function commitCurrentInputs() {
-  if (!activeModule) return;
 
-  const test = getCurrentTestRecord();
+  if (!activeModule) {
+    return;
+  }
+
+  const test =
+    getCurrentTestRecord();
 
   document
-    .querySelectorAll("#app-viewport input[data-field-id]")
+    .querySelectorAll(
+      "#app-viewport input[data-field-id]"
+    )
     .forEach(input => {
-      const fieldId = input.getAttribute("data-field-id");
 
-      if (input.value === "") {
-        test.inputs[fieldId] = null;
+      const fieldId =
+        input.getAttribute(
+          "data-field-id"
+        );
+
+      if (
+        input.value === ""
+      ) {
+
+        test.inputs[fieldId] =
+          null;
+
       } else {
-        test.inputs[fieldId] = parseFloat(input.value);
+
+        test.inputs[fieldId] =
+          parseFloat(
+            input.value
+          );
       }
     });
 
@@ -735,20 +1867,38 @@ function commitCurrentInputs() {
 }
 
 
-function handleInputSilent(fieldId, value) {
-  if (!activeModule) return;
+function handleInputSilent(
+  fieldId,
+  value
+) {
 
-  const test = getCurrentTestRecord();
+  if (!activeModule) {
+    return;
+  }
+
+  const test =
+    getCurrentTestRecord();
 
   test.inputs[fieldId] =
-    value === "" ? null : parseFloat(value);
+    value === ""
+      ? null
+      : parseFloat(value);
 
   saveRecord(test);
+
+  processRecord();
 }
 
 
-function handleInput(fieldId, value) {
-  handleInputSilent(fieldId, value);
+function handleInput(
+  fieldId,
+  value
+) {
+
+  handleInputSilent(
+    fieldId,
+    value
+  );
 
   processRecord();
   patchCalculatedFields();
@@ -756,46 +1906,66 @@ function handleInput(fieldId, value) {
 
 
 /* =========================================================================
-   8. RELATIONSHIP RESOLUTION
-   =========================================================================
-   
-   This replaces the old "search every test for a matching key" behavior.
-   
-   A dependency declares:
-   
-       providerModule
-       relationship
-       selection
-   
-   The resolver follows those rules.
+   12. RELATIONSHIP RESOLUTION
    ========================================================================= */
 
-function resolveDependency(dependency) {
-  if (!activeModule || !dependency) {
+function resolveDependency(
+  dependency
+) {
+
+  if (
+    !activeModule ||
+    !dependency
+  ) {
     return null;
   }
 
-  const project = getProjectNode();
+  const project =
+    getProjectNode();
 
-  if (dependency.relationship === "SAME_PROJECT") {
-    return resolveSameProjectDependency(project, dependency);
+  if (
+    dependency.relationship ===
+    "SAME_PROJECT"
+  ) {
+
+    return resolveSameProjectDependency(
+      project,
+      dependency
+    );
   }
 
   return null;
 }
 
 
-function resolveSameProjectDependency(project, dependency) {
+function resolveSameProjectDependency(
+  project,
+  dependency
+) {
+
   const candidates = [];
 
-  Object.values(project.tests).forEach(test => {
-    if (test.moduleId !== dependency.providerModuleId) {
+  Object.values(
+    project.tests
+  ).forEach(test => {
+
+    if (
+      test.moduleId !==
+      dependency.providerModuleId
+    ) {
       return;
     }
 
-    const value = test.effectiveOutputs?.[dependency.valueKey];
+    const value =
+      test.effectiveOutputs?.[
+        dependency.valueKey
+      ];
 
-    if (value === undefined || value === null || isNaN(value)) {
+    if (
+      value === undefined ||
+      value === null ||
+      isNaN(value)
+    ) {
       return;
     }
 
@@ -805,69 +1975,107 @@ function resolveSameProjectDependency(project, dependency) {
     });
   });
 
-  if (candidates.length === 0) {
+  if (
+    candidates.length === 0
+  ) {
     return null;
   }
 
   /*
-   * Selection is deliberately explicit.
-   * We do not silently use the first matching value.
+   * Explicit selection rule.
    */
-  if (dependency.selection === "MOST_RECENT") {
-    candidates.sort((a, b) => {
-      const aDate = new Date(
-        a.test.testedAt ||
-        a.test.modifiedAt ||
-        a.test.createdAt
-      );
 
-      const bDate = new Date(
-        b.test.testedAt ||
-        b.test.modifiedAt ||
-        b.test.createdAt
-      );
+  if (
+    dependency.selection ===
+    "MOST_RECENT"
+  ) {
 
-      return bDate - aDate;
-    });
+    candidates.sort(
+      (a, b) => {
+
+        const aDate =
+          new Date(
+            a.test.testedAt ||
+            a.test.obtainedAt ||
+            a.test.modifiedAt ||
+            a.test.createdAt
+          );
+
+        const bDate =
+          new Date(
+            b.test.testedAt ||
+            b.test.obtainedAt ||
+            b.test.modifiedAt ||
+            b.test.createdAt
+          );
+
+        return bDate - aDate;
+      }
+    );
   }
 
-  const selected = candidates[0];
+  const selected =
+    candidates[0];
 
   return {
-    value: selected.value,
+
+    value:
+      selected.value,
 
     source: {
-      recordType: "TEST",
-      testId: selected.test.testId,
-      moduleId: selected.test.moduleId,
-      projectId: project.projectId
+
+      recordType:
+        "TEST",
+
+      testId:
+        selected.test.testId,
+
+      moduleId:
+        selected.test.moduleId,
+
+      projectId:
+        project.projectId
     },
 
-    selection: dependency.selection || "FIRST_VALID"
+    selection:
+      dependency.selection ||
+      "FIRST_VALID"
   };
 }
 
 
 /* =========================================================================
-   9. VALUE RESOLUTION
+   13. VALUE RESOLUTION
    ========================================================================= */
 
-function getLocalValue(key) {
-  const test = getCurrentTestRecord();
+function getLocalValue(
+  key
+) {
 
-  if (!test) return null;
+  const test =
+    getCurrentTestRecord();
+
+  if (!test) {
+    return null;
+  }
 
   if (
-    test.inputs[key] !== undefined &&
-    test.inputs[key] !== null
+    test.inputs[key] !==
+      undefined &&
+    test.inputs[key] !==
+      null
   ) {
+
     return test.inputs[key];
   }
 
   if (
-    test.effectiveOutputs[key] !== undefined &&
-    test.effectiveOutputs[key] !== null
+    test.effectiveOutputs[key] !==
+      undefined &&
+    test.effectiveOutputs[key] !==
+      null
   ) {
+
     return test.effectiveOutputs[key];
   }
 
@@ -875,64 +2083,108 @@ function getLocalValue(key) {
 }
 
 
-function getResolvedValue(key) {
-  const local = getLocalValue(key);
+function getResolvedValue(
+  key
+) {
 
-  if (local !== null && local !== undefined) {
+  const local =
+    getLocalValue(key);
+
+  if (
+    local !== null &&
+    local !== undefined
+  ) {
+
     return {
+
       value: local,
+
       source: {
-        recordType: "CURRENT_TEST",
-        testId: getCurrentTestRecord().testId
+
+        recordType:
+          "CURRENT_TEST",
+
+        testId:
+          getCurrentTestRecord()
+            .testId
       }
     };
   }
 
-  if (!activeModule || !activeModule.dependencies) {
+  if (
+    !activeModule ||
+    !activeModule.dependencies
+  ) {
+
     return null;
   }
 
-  const dependency = activeModule.dependencies.find(
-    dep => dep.valueKey === key
-  );
+  const dependency =
+    activeModule.dependencies.find(
+      dep =>
+        dep.valueKey === key
+    );
 
   if (!dependency) {
     return null;
   }
 
-  return resolveDependency(dependency);
+  return resolveDependency(
+    dependency
+  );
 }
 
 
 /* =========================================================================
-   10. ENGINE OPERATIONS
+   14. ENGINE OPERATIONS
    ========================================================================= */
 
 const EngineOps = {
 
-  ADD: (a, b) => a + b,
+  ADD: (a, b) =>
+    a + b,
 
-  SUBTRACT: (a, b) => a - b,
+  SUBTRACT: (a, b) =>
+    a - b,
 
-  MULTIPLY: (a, b) => a * b,
+  MULTIPLY: (a, b) =>
+    a * b,
 
   DIVIDE: (a, b) => {
-    if (b === 0 || b === null || b === undefined) {
+
+    if (
+      b === 0 ||
+      b === null ||
+      b === undefined
+    ) {
       return null;
     }
 
     return a / b;
   },
 
-  ROUND: (value, decimals) => {
-    if (value === null || value === undefined || isNaN(value)) {
+  ROUND: (
+    value,
+    decimals
+  ) => {
+
+    if (
+      value === null ||
+      value === undefined ||
+      isNaN(value)
+    ) {
       return null;
     }
 
-    const factor = Math.pow(10, decimals);
+    const factor =
+      Math.pow(
+        10,
+        decimals
+      );
 
     return Math.round(
-      (value + Number.EPSILON) * factor
+      (value + Number.EPSILON) *
+      factor
     ) / factor;
   }
 
@@ -940,142 +2192,312 @@ const EngineOps = {
 
 
 /* =========================================================================
-   11. PROCESSING ENGINE
+   15. PROCESSING ENGINE
    ========================================================================= */
 
 function processRecord() {
-  if (!activeModule || !activeModule.calculations) {
+
+  if (
+    !activeModule ||
+    !activeModule.calculations
+  ) {
     return;
   }
 
-  const test = getCurrentTestRecord();
+  const test =
+    getCurrentTestRecord();
 
   let changed = true;
   let guard = 0;
 
-  while (changed && guard < 100) {
+  while (
+    changed &&
+    guard < 100
+  ) {
 
     changed = false;
     guard++;
 
-    activeModule.calculations.forEach(calc => {
+    activeModule.calculations
+      .forEach(calc => {
 
-      const inputValues = [];
+        const inputValues = [];
 
-      for (const input of calc.inputs) {
-
-        if (
-          typeof input === "number" &&
-          !isNaN(input)
+        for (
+          const input of calc.inputs
         ) {
-          inputValues.push(input);
-          continue;
+
+          if (
+            typeof input ===
+              "number" &&
+            !isNaN(input)
+          ) {
+
+            inputValues.push(
+              input
+            );
+
+            continue;
+          }
+
+          const resolved =
+            getResolvedValue(
+              input
+            );
+
+          if (
+            !resolved ||
+            resolved.value === null ||
+            resolved.value === undefined ||
+            isNaN(resolved.value)
+          ) {
+
+            return;
+          }
+
+          inputValues.push(
+            resolved.value
+          );
         }
 
-        const resolved = getResolvedValue(input);
+        const operation =
+          EngineOps[calc.op];
 
         if (
-          !resolved ||
-          resolved.value === null ||
-          resolved.value === undefined ||
-          isNaN(resolved.value)
+          typeof operation !==
+          "function"
         ) {
+
+          console.error(
+            `Unknown engine operation: ${calc.op}`
+          );
+
           return;
         }
 
-        inputValues.push(resolved.value);
-      }
+        const rawResult =
+          operation(
+            ...inputValues
+          );
 
-      const operation = EngineOps[calc.op];
+        if (
+          rawResult === null ||
+          rawResult === undefined ||
+          isNaN(rawResult)
+        ) {
 
-      if (typeof operation !== "function") {
-        console.error(
-          `Unknown engine operation: ${calc.op}`
-        );
-        return;
-      }
+          return;
+        }
 
-      const rawResult = operation(...inputValues);
+        const roundedResult =
+          EngineOps.ROUND(
+            rawResult,
+            calc.precision ??
+              3
+          );
 
-      if (
-        rawResult === null ||
-        rawResult === undefined ||
-        isNaN(rawResult)
-      ) {
-        return;
-      }
+        const previous =
+          test.calculatedOutputs[
+            calc.outputKey
+          ];
 
-      const roundedResult = EngineOps.ROUND(
-        rawResult,
-        calc.precision ?? 3
-      );
+        test.calculatedOutputs[
+          calc.outputKey
+        ] = roundedResult;
 
-      const previous =
-        test.calculatedOutputs[calc.outputKey];
+        const override =
+          test.manualOverrides[
+            calc.outputKey
+          ];
 
-      test.calculatedOutputs[calc.outputKey] =
-        roundedResult;
+        test.effectiveOutputs[
+          calc.outputKey
+        ] =
+          override !== undefined &&
+          override !== null
+            ? override
+            : roundedResult;
 
-      const override =
-        test.manualOverrides[calc.outputKey];
+        /*
+         * Preserve the calculation chain.
+         *
+         * A later refinement can de-duplicate these records by calculation
+         * state. For now the audit trail remains intentionally explicit.
+         */
 
-      test.effectiveOutputs[calc.outputKey] =
-        override !== undefined &&
-        override !== null
-          ? override
-          : roundedResult;
+        test.calculationSteps.push({
 
-      /*
-       * Preserve the calculation chain.
-       */
-      test.calculationSteps.push({
-        calculationId: calc.id,
-        outputKey: calc.outputKey,
-        rawResult,
-        roundedResult,
-        precision: calc.precision ?? 3,
-        calculatedAt: new Date().toISOString()
+          calculationId:
+            calc.id,
+
+          outputKey:
+            calc.outputKey,
+
+          inputs:
+            calc.inputs,
+
+          inputValues:
+            inputValues,
+
+          rawResult,
+
+          roundedResult,
+
+          precision:
+            calc.precision ??
+            3,
+
+          calculatedAt:
+            new Date().toISOString()
+        });
+
+        test.provenance[
+          calc.outputKey
+        ] = {
+
+          type:
+            "CALCULATED",
+
+          calculationId:
+            calc.id,
+
+          inputs:
+            calc.inputs
+        };
+
+        if (
+          previous !==
+          roundedResult
+        ) {
+
+          changed = true;
+        }
       });
+  }
 
-      /*
-       * Preserve source information for dependencies.
-       */
-      test.provenance[calc.outputKey] = {
-        type: "CALCULATED",
-        calculationId: calc.id,
-        inputs: calc.inputs
-      };
+  /*
+   * Remove calculated values whose dependencies are no longer available.
+   * Manual overrides are deliberately preserved.
+   */
 
-      if (previous !== roundedResult) {
-        changed = true;
+  activeModule.calculations
+    .forEach(calc => {
+
+      const canCalculate =
+        calculationInputsAvailable(
+          calc
+        );
+
+      if (!canCalculate) {
+
+        delete test.calculatedOutputs[
+          calc.outputKey
+        ];
+
+        if (
+          test.manualOverrides[
+            calc.outputKey
+          ] === undefined
+        ) {
+
+          delete test.effectiveOutputs[
+            calc.outputKey
+          ];
+
+          if (
+            test.provenance[
+              calc.outputKey
+            ]?.type ===
+              "CALCULATED"
+          ) {
+
+            delete test.provenance[
+              calc.outputKey
+            ];
+          }
+        }
       }
     });
-  }
 
   saveRecord(test);
 }
 
 
+function calculationInputsAvailable(
+  calculation
+) {
+
+  for (
+    const input of calculation.inputs
+  ) {
+
+    if (
+      typeof input === "number"
+    ) {
+      continue;
+    }
+
+    const resolved =
+      getResolvedValue(
+        input
+      );
+
+    if (
+      !resolved ||
+      resolved.value === null ||
+      resolved.value === undefined ||
+      isNaN(resolved.value)
+    ) {
+
+      return false;
+    }
+  }
+
+  return true;
+}
+
+
 /* =========================================================================
-   12. MANUAL OVERRIDE
+   16. MANUAL OVERRIDE
    ========================================================================= */
 
-function handleManualOverride(key, value) {
+function handleManualOverride(
+  key,
+  value
+) {
 
-  const test = getCurrentTestRecord();
+  const test =
+    getCurrentTestRecord();
 
   const numericValue =
     value === ""
       ? null
       : parseFloat(value);
 
-  test.manualOverrides[key] = numericValue;
+  if (
+    numericValue === null ||
+    isNaN(numericValue)
+  ) {
 
-  test.effectiveOutputs[key] = numericValue;
+    return;
+  }
+
+  test.manualOverrides[key] =
+    numericValue;
+
+  test.effectiveOutputs[key] =
+    numericValue;
 
   test.provenance[key] = {
-    type: "MANUAL_OVERRIDE",
-    enteredAt: new Date().toISOString()
+
+    type:
+      "MANUAL_OVERRIDE",
+
+    enteredAt:
+      new Date().toISOString(),
+
+    source:
+      "USER_ENTERED"
   };
 
   saveRecord(test);
@@ -1085,101 +2507,262 @@ function handleManualOverride(key, value) {
 
 
 /* =========================================================================
-   13. DEPENDENCY INSPECTION
+   17. BACKWARD DEPENDENCY TRACING
+   =========================================================================
+   
+   This is intentionally separate from the normal calculation engine.
+
+   Normal engine direction:
+
+       inputs → calculations → outputs
+
+   Navigation direction:
+
+       desired output
+            ↓
+       producing calculation
+            ↓
+       its inputs
+            ↓
+       calculated inputs recurse
+            ↓
+       leaf inputs / external dependencies
+
+   This is only invoked when the technician asks the system to find what is
+   missing. It does NOT automatically drag the user backward through the
+   entire procedure every time a value is missing.
    ========================================================================= */
 
-function getMissingDependencies(outputKey) {
+function traceBackwardDependencies(
+  outputKey
+) {
 
   if (!activeModule) {
-    return [];
+    return null;
   }
 
-  const calculation =
-    activeModule.calculations?.find(
-      calc => calc.outputKey === outputKey
-    );
+  const result = {
 
-  if (!calculation) {
-    return [];
-  }
+    target: outputKey,
 
-  const missing = [];
+    path: [],
 
-  calculation.inputs.forEach(inputKey => {
+    leaves: []
+  };
 
-    if (typeof inputKey === "number") {
-      return;
-    }
+  const visiting =
+    new Set();
 
-    const resolved = getResolvedValue(inputKey);
+  function trace(
+    key,
+    path
+  ) {
 
     if (
-      resolved &&
-      resolved.value !== null &&
-      resolved.value !== undefined &&
-      !isNaN(resolved.value)
+      visiting.has(key)
     ) {
+
       return;
     }
 
-    const localField =
-      activeModule.fields?.find(
-        field => field.id === inputKey
-      );
+    visiting.add(key);
 
-    const externalDependency =
-      activeModule.dependencies?.find(
-        dep => dep.valueKey === inputKey
-      );
+    const calculation =
+      activeModule.calculations
+        ?.find(
+          calc =>
+            calc.outputKey ===
+            key
+        );
 
-    if (externalDependency) {
+    /*
+     * This is a leaf field rather than a calculated output.
+     */
 
-      missing.push({
-        key: inputKey,
-        label:
-          localField?.label ||
-          externalDependency.label ||
-          inputKey,
-        type: "DEPENDENCY",
-        dependency: externalDependency
+    if (!calculation) {
+
+      const localField =
+        activeModule.fields
+          ?.find(
+            field =>
+              field.id === key
+          );
+
+      const dependency =
+        activeModule.dependencies
+          ?.find(
+            dep =>
+              dep.valueKey === key
+          );
+
+      const resolved =
+        getResolvedValue(key);
+
+      if (
+        !resolved ||
+        resolved.value === null ||
+        resolved.value === undefined ||
+        isNaN(resolved.value)
+      ) {
+
+        result.leaves.push({
+
+          key,
+
+          label:
+            localField?.label ||
+            dependency?.label ||
+            key,
+
+          type:
+            dependency
+              ? "DEPENDENCY"
+              : "LOCAL",
+
+          dependency:
+            dependency || null,
+
+          path: [
+            ...path,
+            key
+          ]
+        });
+      }
+
+      visiting.delete(key);
+
+      return;
+    }
+
+    const nextPath =
+      [
+        ...path,
+        key
+      ];
+
+    calculation.inputs
+      .forEach(input => {
+
+        if (
+          typeof input === "number"
+        ) {
+          return;
+        }
+
+        const resolved =
+          getResolvedValue(
+            input
+          );
+
+        if (
+          resolved &&
+          resolved.value !== null &&
+          resolved.value !== undefined &&
+          !isNaN(resolved.value)
+        ) {
+
+          return;
+        }
+
+        trace(
+          input,
+          nextPath
+        );
       });
 
-      return;
-    }
+    visiting.delete(key);
+  }
 
-    missing.push({
-      key: inputKey,
-      label:
-        localField?.label ||
-        inputKey,
-      type: "LOCAL"
-    });
-  });
+  trace(
+    outputKey,
+    []
+  );
 
-  return missing;
+  result.path =
+    result.leaves;
+
+  return result;
 }
 
 
 /* =========================================================================
-   14. MISSING DEPENDENCY UI
+   18. MISSING DEPENDENCY INSPECTION
    ========================================================================= */
 
-function handleMissingDependencyClick(outputKey) {
+function getMissingDependencies(
+  outputKey
+) {
 
-  const resolved = getResolvedValue(outputKey);
+  const trace =
+    traceBackwardDependencies(
+      outputKey
+    );
+
+  if (!trace) {
+    return [];
+  }
+
+  /*
+   * Deduplicate leaf dependencies.
+   */
+
+  const unique =
+    new Map();
+
+  trace.leaves.forEach(
+    leaf => {
+
+      if (
+        !unique.has(
+          leaf.key
+        )
+      ) {
+
+        unique.set(
+          leaf.key,
+          leaf
+        );
+      }
+    }
+  );
+
+  return Array.from(
+    unique.values()
+  );
+}
+
+
+/* =========================================================================
+   19. MISSING DEPENDENCY UI
+   ========================================================================= */
+
+function handleMissingDependencyClick(
+  outputKey
+) {
+
+  const resolved =
+    getResolvedValue(
+      outputKey
+    );
 
   if (
     resolved &&
     resolved.value !== null &&
     resolved.value !== undefined
   ) {
+
     return;
   }
 
   const missing =
-    getMissingDependencies(outputKey);
+    getMissingDependencies(
+      outputKey
+    );
 
-  if (missing.length === 0) {
+  if (
+    missing.length === 0
+  ) {
+
     return;
   }
 
@@ -1193,24 +2776,38 @@ function handleMissingDependencyClick(outputKey) {
   }
 
   const parent =
-    calcEl.closest(".speed-card, .card");
+    calcEl.closest(
+      ".speed-card, .card"
+    );
 
   if (!parent) {
     return;
   }
 
   const old =
-    parent.querySelector(".dependency-box");
+    parent.querySelector(
+      ".dependency-box"
+    );
 
   if (old) {
+
     old.remove();
+
     return;
   }
 
   const box =
-    document.createElement("div");
+    document.createElement(
+      "div"
+    );
 
-  box.className = "dependency-box";
+  box.className =
+    "dependency-box";
+
+  const trace =
+    traceBackwardDependencies(
+      outputKey
+    );
 
   let html = `
     <div class="dependency-title">
@@ -1218,91 +2815,223 @@ function handleMissingDependencyClick(outputKey) {
     </div>
   `;
 
-  missing.forEach(dep => {
+  /*
+   * Show the dependency chain the system found.
+   */
 
-    if (dep.type === "LOCAL") {
-
-      html += `
-        <div class="dependency-detail">
-          This calculation requires
-          <strong>${dep.label}</strong>.
-        </div>
-      `;
-
-      return;
-    }
-
-    const providerId =
-      dep.dependency.providerModuleId;
-
-    const provider =
-      providerId &&
-      ModuleRegistry.get(providerId);
+  if (
+    trace &&
+    trace.leaves.length
+  ) {
 
     html += `
       <div class="dependency-detail">
-        Requires <strong>${dep.label}</strong>
-        from the
-        <strong>${provider?.meta?.title || providerId}</strong>
-        using the declared relationship:
-        <strong>${dep.dependency.relationship}</strong>.
+        The system traced this calculation backward to
+        the information it actually needs:
       </div>
     `;
 
-    if (provider) {
+    trace.leaves.forEach(
+      leaf => {
+
+        const pathText =
+          leaf.path.join(
+            " → "
+          );
+
+        html += `
+          <div class="dependency-path">
+            ${pathText}
+          </div>
+        `;
+      }
+    );
+  }
+
+  /*
+   * Each leaf gets its own resolution options.
+   */
+
+  missing.forEach(
+    dep => {
 
       html += `
-        <button
-          class="btn-action"
-          style="height:44px;font-size:0.9rem;width:100%;"
-          onclick="selectModule('${providerId}')">
-          Open ${provider.meta.title} →
-        </button>
+        <div class="dependency-detail">
+          Missing:
+          <strong>${dep.label}</strong>
+        </div>
       `;
-    } else {
+
+      if (
+        dep.type === "LOCAL"
+      ) {
+
+        html += `
+          <div class="dependency-choice">
+
+            <button
+              class="btn-action"
+              style="height:44px;font-size:0.9rem;width:100%;"
+              onclick="
+                navigateToField(
+                  '${dep.key}',
+                  '${activeModule.meta.id}'
+                );
+                this.closest('.dependency-box').remove();
+              ">
+              Find / Enter ${dep.label}
+            </button>
+
+            <div class="dependency-detail">
+              This is a local input for the current test.
+            </div>
+
+          </div>
+        `;
+
+        return;
+      }
+
+      const providerId =
+        dep.dependency
+          ?.providerModuleId;
+
+      const provider =
+        providerId &&
+        ModuleRegistry.get(
+          providerId
+        );
 
       html += `
-        <div class="dependency-detail status-warning">
-          Provider module is not installed yet.
-          The system will not substitute another value automatically.
+        <div class="dependency-detail">
+          Requires
+          <strong>${dep.label}</strong>
+          from the declared provider:
+          <strong>
+            ${provider?.meta?.title || providerId || "Not installed"}
+          </strong>.
+        </div>
+      `;
+
+      if (provider) {
+
+        html += `
+          <button
+            class="btn-action"
+            style="height:44px;font-size:0.9rem;width:100%;"
+            onclick="
+              selectModule('${providerId}');
+              this.closest('.dependency-box').remove();
+            ">
+            Find / Complete Dependency →
+          </button>
+        `;
+      }
+
+      /*
+       * This is the existing manual-entry escape hatch.
+       * We deliberately do NOT force recursive navigation.
+       */
+
+      html += `
+        <div class="dependency-choice">
+
+          <input
+            type="number"
+            inputmode="decimal"
+            step="any"
+            placeholder="Enter ${dep.label} manually"
+            style="height:44px;font-size:0.95rem;"
+            data-manual-dependency-key="${dep.key}">
+
+          <button
+            class="btn-action"
+            style="height:44px;font-size:0.9rem;width:100%;"
+            onclick="
+              const input =
+                this.parentElement.querySelector(
+                  '[data-manual-dependency-key="${dep.key}"]'
+                );
+
+              handleManualOverride(
+                '${dep.key}',
+                input.value
+              );
+
+              this.closest('.dependency-box').remove();
+            ">
+            Enter Value Manually
+          </button>
+
         </div>
       `;
     }
+  );
 
-    html += `
-      <input
-        type="number"
-        inputmode="decimal"
-        placeholder="Manual ${dep.label}"
-        style="height:44px;font-size:0.95rem;margin-bottom:0.5rem;"
-        onchange="
-          handleManualOverride('${dep.key}', this.value);
-          this.closest('.dependency-box').remove();
-        ">
-    `;
-  });
+  box.innerHTML =
+    html;
 
-  box.innerHTML = html;
-
-  parent.appendChild(box);
+  parent.appendChild(
+    box
+  );
 }
 
 
 /* =========================================================================
-   15. PATCH CALCULATED DISPLAY VALUES
+   20. RENDERED FIELD REGISTRATION
+   ========================================================================= */
+
+function registerRenderedField(
+  fieldId,
+  element,
+  stepId = null
+) {
+
+  if (!activeModule) {
+    return;
+  }
+
+  const test =
+    getCurrentTestRecord();
+
+  NavigationRegistry.registerField({
+
+    moduleId:
+      activeModule.meta.id,
+
+    testId:
+      test?.testId || null,
+
+    fieldId,
+
+    stepId,
+
+    element
+  });
+}
+
+
+/* =========================================================================
+   21. PATCH CALCULATED DISPLAY VALUES
    ========================================================================= */
 
 function patchCalculatedFields() {
 
   document
-    .querySelectorAll("[data-calc-field-id]")
+    .querySelectorAll(
+      "[data-calc-field-id]"
+    )
     .forEach(el => {
 
       const key =
-        el.getAttribute("data-calc-field-id");
+        el.getAttribute(
+          "data-calc-field-id"
+        );
 
       const resolved =
-        getResolvedValue(key);
+        getResolvedValue(
+          key
+        );
 
       el.textContent =
         resolved &&
@@ -1315,40 +3044,54 @@ function patchCalculatedFields() {
 
 
 /* =========================================================================
-   16. MODE / STEP CONTROL
+   22. MODE / STEP CONTROL
    ========================================================================= */
 
-function goToStep(index) {
+function goToStep(
+  index
+) {
 
   commitCurrentInputs();
 
   if (
     activeModule &&
     index >= 0 &&
-    index < activeModule.steps.length
+    index <
+      activeModule.steps.length
   ) {
-    currentStepIndex = index;
+
+    currentStepIndex =
+      index;
+
     processAndRender();
   }
 }
 
 
-function setMode(mode) {
+function setMode(
+  mode
+) {
 
   commitCurrentInputs();
 
-  currentMode = mode;
+  currentMode =
+    mode;
 
   document
-    .querySelectorAll(".mode-btn")
+    .querySelectorAll(
+      ".mode-btn"
+    )
     .forEach(btn => {
 
       const label =
-        btn.textContent.toUpperCase();
+        btn.textContent
+          .toUpperCase();
 
       btn.classList.toggle(
         "active",
-        label.includes(mode.substring(0, 4))
+        label.includes(
+          mode.substring(0, 4)
+        )
       );
     });
 
@@ -1357,235 +3100,404 @@ function setMode(mode) {
 
 
 /* =========================================================================
-   17. RENDERING
+   23. RENDERING
    ========================================================================= */
 
 function processAndRender() {
 
   processRecord();
 
+  NavigationRegistry
+    .clearRenderedFields();
+
   const viewport =
-    document.getElementById("app-viewport");
+    document.getElementById(
+      "app-viewport"
+    );
 
   viewport.innerHTML = "";
 
   if (!activeModule) {
+
     viewport.innerHTML =
-      `<div class="card">No module selected.</div>`;
+      `<div class="card">
+        No module selected.
+      </div>`;
+
     return;
   }
 
-  if (currentMode === "INTERACTIVE") {
-    renderInteractiveMode(viewport);
+  if (
+    currentMode ===
+    "INTERACTIVE"
+  ) {
+
+    renderInteractiveMode(
+      viewport
+    );
+
+  } else if (
+    currentMode ===
+    "SPEED"
+  ) {
+
+    renderSpeedMode(
+      viewport
+    );
+
+  } else if (
+    currentMode ===
+    "TRAINING"
+  ) {
+
+    renderTrainingMode(
+      viewport
+    );
   }
 
-  else if (currentMode === "SPEED") {
-    renderSpeedMode(viewport);
-  }
-
-  else if (currentMode === "TRAINING") {
-    renderTrainingMode(viewport);
-  }
+  renderNavigationPerspective();
 }
 
 
-function renderInteractiveMode(container) {
+function renderInteractiveMode(
+  container
+) {
 
   const step =
-    activeModule.steps[currentStepIndex];
+    activeModule.steps[
+      currentStepIndex
+    ];
+
+  if (!step) {
+    return;
+  }
 
   const card =
-    document.createElement("div");
+    document.createElement(
+      "div"
+    );
 
-  card.className = "card";
+  card.className =
+    "card";
 
   const title =
-    document.createElement("div");
+    document.createElement(
+      "div"
+    );
 
-  title.className = "card-title";
+  title.className =
+    "card-title";
 
   title.textContent =
-    `Step ${currentStepIndex + 1} of ${activeModule.steps.length}: ${step.title}`;
+    `Step ${currentStepIndex + 1} of ` +
+    `${activeModule.steps.length}: ` +
+    `${step.title}`;
 
-  card.appendChild(title);
+  card.appendChild(
+    title
+  );
 
-  step.components.forEach(comp => {
+  step.components.forEach(
+    comp => {
 
-    switch (comp.type) {
+      switch (
+        comp.type
+      ) {
 
-      case "instruction": {
+        case "instruction": {
 
-        const inst =
-          document.createElement("div");
+          const inst =
+            document.createElement(
+              "div"
+            );
 
-        inst.className = "instruction";
-        inst.textContent = comp.text;
+          inst.className =
+            "instruction";
 
-        card.appendChild(inst);
+          inst.textContent =
+            comp.text;
 
-        break;
-      }
-
-      case "field-input": {
-
-        const group =
-          document.createElement("div");
-
-        group.className = "field-group";
-
-        const label =
-          document.createElement("label");
-
-        label.textContent = comp.label;
-
-        const input =
-          document.createElement("input");
-
-        input.type = "number";
-        input.inputMode = "decimal";
-        input.step = "any";
-
-        input.setAttribute(
-          "data-field-id",
-          comp.fieldId
-        );
-
-        const value =
-          getLocalValue(comp.fieldId);
-
-        input.value =
-          value === null ? "" : value;
-
-        input.onchange = e =>
-          handleInputSilent(
-            comp.fieldId,
-            e.target.value
+          card.appendChild(
+            inst
           );
 
-        group.appendChild(label);
-        group.appendChild(input);
+          break;
+        }
 
-        card.appendChild(group);
 
-        break;
-      }
+        case "field-input": {
 
-      case "formula": {
+          const group =
+            document.createElement(
+              "div"
+            );
 
-        const box =
-          document.createElement("div");
+          group.className =
+            "field-group";
 
-        box.className = "formula-box";
-        box.textContent = comp.expression;
+          const label =
+            document.createElement(
+              "label"
+            );
 
-        card.appendChild(box);
+          label.textContent =
+            comp.label;
 
-        break;
-      }
+          const input =
+            document.createElement(
+              "input"
+            );
 
-      case "value-display": {
+          input.type =
+            "number";
 
-        const resolved =
-          getResolvedValue(comp.fieldId);
+          input.inputMode =
+            "decimal";
 
-        const value =
-          resolved?.value ?? "--";
+          input.step =
+            "any";
 
-        const box =
-          document.createElement("div");
-
-        box.className = "value-display";
-
-        box.innerHTML = `
-          <div
-            class="val"
-            data-calc-field-id="${comp.fieldId}">
-            ${value}
-            <span class="unit">${comp.unit || ""}</span>
-          </div>
-        `;
-
-        box.onclick =
-          () => handleMissingDependencyClick(
+          input.setAttribute(
+            "data-field-id",
             comp.fieldId
           );
 
-        if (resolved?.source) {
+          const value =
+            getLocalValue(
+              comp.fieldId
+            );
 
-          const provenance =
-            document.createElement("div");
+          input.value =
+            value === null
+              ? ""
+              : value;
 
-          provenance.className =
-            "provenance";
+          input.onchange =
+            e =>
+              handleInput(
+                comp.fieldId,
+                e.target.value
+              );
 
-          if (
-            resolved.source.recordType ===
-            "TEST"
-          ) {
+          group.appendChild(
+            label
+          );
 
-            provenance.textContent =
-              `Source: ${resolved.source.moduleId} ` +
-              `(Test ${resolved.source.testId})`;
-          }
+          group.appendChild(
+            input
+          );
 
-          else if (
-            resolved.source.recordType ===
-            "CURRENT_TEST"
-          ) {
+          card.appendChild(
+            group
+          );
 
-            provenance.textContent =
-              "Source: current test";
-          }
+          registerRenderedField(
+            comp.fieldId,
+            input,
+            step.id
+          );
 
-          box.appendChild(provenance);
+          break;
         }
 
-        card.appendChild(box);
 
-        break;
-      }
+        case "formula": {
 
-      case "action-button": {
+          const box =
+            document.createElement(
+              "div"
+            );
 
-        const button =
-          document.createElement("button");
+          box.className =
+            "formula-box";
 
-        button.className = "btn-action";
-        button.textContent = comp.label;
+          box.textContent =
+            comp.expression;
 
-        button.onclick = () => {
+          card.appendChild(
+            box
+          );
 
-          commitCurrentInputs();
+          break;
+        }
+
+
+        case "value-display": {
+
+          const resolved =
+            getResolvedValue(
+              comp.fieldId
+            );
+
+          const value =
+            resolved?.value ??
+            "--";
+
+          const box =
+            document.createElement(
+              "div"
+            );
+
+          box.className =
+            "value-display";
+
+          const valueElement =
+            document.createElement(
+              "div"
+            );
+
+          valueElement.className =
+            "val";
+
+          valueElement.setAttribute(
+            "data-calc-field-id",
+            comp.fieldId
+          );
+
+          valueElement.textContent =
+            value;
+
+          const unit =
+            document.createElement(
+              "span"
+            );
+
+          unit.className =
+            "unit";
+
+          unit.textContent =
+            comp.unit || "";
+
+          valueElement.appendChild(
+            unit
+          );
+
+          box.appendChild(
+            valueElement
+          );
+
+          box.onclick =
+            () =>
+              handleMissingDependencyClick(
+                comp.fieldId
+              );
 
           if (
-            comp.action === "JUMP_MODULE"
+            resolved?.source
           ) {
-            selectModule(comp.targetModuleId);
+
+            const provenance =
+              document.createElement(
+                "div"
+              );
+
+            provenance.className =
+              "provenance";
+
+            if (
+              resolved.source
+                .recordType ===
+              "TEST"
+            ) {
+
+              provenance.textContent =
+                `Source: ${resolved.source.moduleId} ` +
+                `(Test ${resolved.source.testId})`;
+            }
+
+            else if (
+              resolved.source
+                .recordType ===
+              "CURRENT_TEST"
+            ) {
+
+              provenance.textContent =
+                "Source: current test";
+            }
+
+            box.appendChild(
+              provenance
+            );
           }
 
-          else if (
-            comp.action === "JUMP_STEP"
-          ) {
-            goToStep(comp.targetStepIndex);
-          }
-        };
+          card.appendChild(
+            box
+          );
 
-        card.appendChild(button);
+          registerRenderedField(
+            comp.fieldId,
+            valueElement,
+            step.id
+          );
 
-        break;
+          break;
+        }
+
+
+        case "action-button": {
+
+          const button =
+            document.createElement(
+              "button"
+            );
+
+          button.className =
+            "btn-action";
+
+          button.textContent =
+            comp.label;
+
+          button.onclick =
+            () => {
+
+              commitCurrentInputs();
+
+              if (
+                comp.action ===
+                "JUMP_MODULE"
+              ) {
+
+                selectModule(
+                  comp.targetModuleId
+                );
+
+              } else if (
+                comp.action ===
+                "JUMP_STEP"
+              ) {
+
+                goToStep(
+                  comp.targetStepIndex
+                );
+              }
+            };
+
+          card.appendChild(
+            button
+          );
+
+          break;
+        }
       }
     }
-  });
+  );
 
   const nav =
-    document.createElement("div");
+    document.createElement(
+      "div"
+    );
 
-  nav.className = "wizard-nav";
+  nav.className =
+    "wizard-nav";
 
-  if (currentStepIndex > 0) {
+  if (
+    currentStepIndex > 0
+  ) {
 
     const button =
-      document.createElement("button");
+      document.createElement(
+        "button"
+      );
 
     button.className =
       "btn-secondary";
@@ -1594,11 +3506,14 @@ function renderInteractiveMode(container) {
       "← Back";
 
     button.onclick =
-      () => goToStep(
-        currentStepIndex - 1
-      );
+      () =>
+        goToStep(
+          currentStepIndex - 1
+        );
 
-    nav.appendChild(button);
+    nav.appendChild(
+      button
+    );
   }
 
   if (
@@ -1607,7 +3522,9 @@ function renderInteractiveMode(container) {
   ) {
 
     const button =
-      document.createElement("button");
+      document.createElement(
+        "button"
+      );
 
     button.className =
       "btn-primary";
@@ -1616,16 +3533,21 @@ function renderInteractiveMode(container) {
       "Next Step →";
 
     button.onclick =
-      () => goToStep(
-        currentStepIndex + 1
-      );
+      () =>
+        goToStep(
+          currentStepIndex + 1
+        );
 
-    nav.appendChild(button);
+    nav.appendChild(
+      button
+    );
 
   } else {
 
     const button =
-      document.createElement("button");
+      document.createElement(
+        "button"
+      );
 
     button.className =
       "btn-primary";
@@ -1637,140 +3559,247 @@ function renderInteractiveMode(container) {
       "✓ Done";
 
     button.onclick =
-      () => goToStep(0);
+      () =>
+        goToStep(0);
 
-    nav.appendChild(button);
+    nav.appendChild(
+      button
+    );
   }
 
-  card.appendChild(nav);
-  container.appendChild(card);
+  card.appendChild(
+    nav
+  );
+
+  container.appendChild(
+    card
+  );
 }
 
 
-function renderSpeedMode(container) {
+function renderSpeedMode(
+  container
+) {
 
   const title =
-    document.createElement("div");
+    document.createElement(
+      "div"
+    );
 
-  title.className = "card-title";
+  title.className =
+    "card-title";
 
   title.textContent =
     `Speed Mode (${activeProjectId})`;
 
-  container.appendChild(title);
+  container.appendChild(
+    title
+  );
 
-  activeModule.fields.forEach(field => {
+  activeModule.fields.forEach(
+    field => {
 
-    const card =
-      document.createElement("div");
+      const card =
+        document.createElement(
+          "div"
+        );
 
-    card.className = "speed-card";
+      card.className =
+        "speed-card";
 
-    const resolved =
-      getResolvedValue(field.id);
+      const resolved =
+        getResolvedValue(
+          field.id
+        );
 
-    const value =
-      resolved?.value ?? "";
+      const value =
+        resolved?.value ?? "";
 
-    if (field.computed) {
+      if (
+        field.computed ||
+        field.external
+      ) {
 
-      card.innerHTML = `
-        <div class="speed-card-main">
-          <div class="speed-info">
-            <div class="speed-label">
-              ${field.label}
+        card.innerHTML = `
+          <div class="speed-card-main">
+
+            <div class="speed-info">
+
+              <div class="speed-label">
+                ${field.label}
+              </div>
+
+              <div class="speed-type">
+                ${field.external
+                  ? "Dependency"
+                  : "Calculated"}
+                (${field.unit || "val"})
+              </div>
+
             </div>
-            <div class="speed-type">
-              Calculated (${field.unit || "val"})
+
+            <div
+              class="speed-calc-val"
+              data-calc-field-id="${field.id}">
+              ${value !== "" ? value : "--"}
             </div>
+
           </div>
+        `;
 
-          <div
-            class="speed-calc-val"
-            data-calc-field-id="${field.id}"
-            onclick="
-              handleMissingDependencyClick('${field.id}')
-            ">
-            ${value !== "" ? value : "--"}
-          </div>
-        </div>
-      `;
+        const valueElement =
+          card.querySelector(
+            "[data-calc-field-id]"
+          );
 
-    } else {
+        valueElement.onclick =
+          () =>
+            handleMissingDependencyClick(
+              field.id
+            );
 
-      card.innerHTML = `
-        <div class="speed-card-main">
-          <div class="speed-info">
-            <div class="speed-label">
-              ${field.label}
+        registerRenderedField(
+          field.id,
+          valueElement
+        );
+
+      } else {
+
+        card.innerHTML = `
+          <div class="speed-card-main">
+
+            <div class="speed-info">
+
+              <div class="speed-label">
+                ${field.label}
+              </div>
+
+              <div class="speed-type">
+                Input (${field.unit || "val"})
+              </div>
+
             </div>
-            <div class="speed-type">
-              Input (${field.unit || "val"})
-            </div>
-          </div>
 
-          <div class="speed-input-wrap">
-            <input
-              type="number"
-              inputmode="decimal"
-              step="any"
-              data-field-id="${field.id}"
-              value="${value}"
-              onchange="
-                handleInput('${field.id}', this.value)
-              ">
+            <div class="speed-input-wrap">
+
+              <input
+                type="number"
+                inputmode="decimal"
+                step="any"
+                data-field-id="${field.id}"
+                value="${value}"
+              >
+
+            </div>
+
           </div>
-        </div>
-      `;
+        `;
+
+        const input =
+          card.querySelector(
+            "input[data-field-id]"
+          );
+
+        input.onchange =
+          e =>
+            handleInput(
+              field.id,
+              e.target.value
+            );
+
+        registerRenderedField(
+          field.id,
+          input
+        );
+      }
+
+      container.appendChild(
+        card
+      );
     }
-
-    container.appendChild(card);
-  });
+  );
 }
 
 
-function renderTrainingMode(container) {
+function renderTrainingMode(
+  container
+) {
 
-  renderInteractiveMode(container);
+  renderInteractiveMode(
+    container
+  );
 
   const step =
-    activeModule.steps[currentStepIndex];
+    activeModule.steps[
+      currentStepIndex
+    ];
 
-  if (step.trainingText) {
+  if (
+    step?.trainingText
+  ) {
 
     const card =
-      document.createElement("div");
+      document.createElement(
+        "div"
+      );
 
-    card.className = "card";
+    card.className =
+      "card";
 
     card.style.borderColor =
       "var(--accent)";
 
-    card.innerHTML = `
-      <div
-        class="card-title"
-        style="color:var(--accent)">
-        Training Context
-      </div>
+    const title =
+      document.createElement(
+        "div"
+      );
 
-      <div class="instruction">
-        ${step.trainingText}
-      </div>
-    `;
+    title.className =
+      "card-title";
 
-    container.appendChild(card);
+    title.style.color =
+      "var(--accent)";
+
+    title.textContent =
+      "Training Context";
+
+    const body =
+      document.createElement(
+        "div"
+      );
+
+    body.className =
+      "instruction";
+
+    body.textContent =
+      step.trainingText;
+
+    card.appendChild(
+      title
+    );
+
+    card.appendChild(
+      body
+    );
+
+    container.appendChild(
+      card
+    );
   }
 }
 
 
 /* =========================================================================
-   18. PROJECT ID
+   24. PROJECT ID
    ========================================================================= */
 
-function updateProjectId(value) {
+function updateProjectId(
+  value
+) {
 
   const trimmed =
-    String(value || "").trim();
+    String(value || "")
+      .trim();
 
   if (!trimmed) {
     return;
@@ -1778,20 +3807,31 @@ function updateProjectId(value) {
 
   commitCurrentInputs();
 
-  activeProjectId = trimmed;
+  activeProjectId =
+    trimmed;
 
-  getProjectNode(activeProjectId);
+  getProjectNode(
+    activeProjectId
+  );
 
   processAndRender();
+
   renderWorkdayNavigation();
+  renderNavigationPerspective();
 }
 
 
 /* =========================================================================
-   19. INITIALIZE
+   25. INITIALIZE
    ========================================================================= */
 
-getProjectNode(activeProjectId);
+getProjectNode(
+  activeProjectId
+);
+
+renderNavigation();
+renderNavigationPerspective();
+
 </script>
 
 <script src="modules/gmb-density.js"></script>
