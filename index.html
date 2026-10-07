@@ -43,9 +43,15 @@
     /* Giant Touch Targets for Mobile Inputs */
     .field-group { margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 0.5rem; }
     label { font-size: 0.9rem; color: var(--muted); font-weight: 600; }
-    input[type="number"], input[type="text"] { background: var(--input-bg); border: 1.5px solid var(--panel-border); color: var(--text); height: 52px; padding: 0 0.85rem; border-radius: 8px; font-size: 1.1rem; font-weight: 600; width: 100%; }
+    input[type="number"], input[type="text"] { background: var(--input-bg); border: 1.5px solid var(--panel-border); color: var(--text); height: 52px; padding: 0 0.85rem; border-radius: 8px; font-size: 1.1rem; font-weight: 600; width: 100%; transition: border-color 0.2s, box-shadow 0.2s; }
     input:focus { outline: none; border-color: var(--accent); background: #000; }
     
+    /* Input Highlight Animation for Local Focus */
+    .input-highlight {
+      border-color: var(--warning) !important;
+      box-shadow: 0 0 10px rgba(214, 158, 46, 0.5) !important;
+    }
+
     .formula-box { background: #0d1117; border-left: 4px solid var(--accent); padding: 0.85rem 1rem; border-radius: 0 8px 8px 0; font-family: monospace; font-size: 0.95rem; margin-bottom: 1.25rem; color: #9ecbff; }
     
     /* Big Bold Display Cards */
@@ -106,22 +112,74 @@
 
   <script>
     // =========================================================================
-    // 1. GLOBAL REGISTRY & RECORD STORE
+    // 1. GLOBAL REGISTRY & HIERARCHICAL PROJECT STORE
     // =========================================================================
     const ModuleRegistry = new Map();
     let activeModule = null;
+    let activeProjectId = "JOB-2173";
     let currentMode = 'INTERACTIVE';
     let currentStepIndex = 0;
 
-    const ActiveRecord = {
-      id: "CORE-001",
-      projectId: "JOB-2173",
-      timestamp: new Date().toISOString(),
-      data: {}
+    // Object-Oriented Project Store Tree
+    const ProjectStore = {
+      projects: {
+        "JOB-2173": {
+          projectId: "JOB-2173",
+          labTests: {}
+        }
+      }
     };
 
+    function getProjectNode(projectId = activeProjectId) {
+      if (!ProjectStore.projects[projectId]) {
+        ProjectStore.projects[projectId] = { projectId, labTests: {} };
+      }
+      return ProjectStore.projects[projectId];
+    }
+
+    function getTestNode(moduleId, projectId = activeProjectId) {
+      const proj = getProjectNode(projectId);
+      if (!proj.labTests[moduleId]) {
+        proj.labTests[moduleId] = {
+          inputs: {},
+          calculatedOutputs: {},
+          manualOverrides: {},
+          effectiveOutputs: {}
+        };
+      }
+      return proj.labTests[moduleId];
+    }
+
+    // High-Level Data Getter adhering to Parallel Manual Override Precedence
+    function getStoredValue(key, moduleId = activeModule?.meta?.id) {
+      if (!moduleId) return null;
+      const testNode = getTestNode(moduleId);
+
+      // 1. Direct Local Input
+      if (testNode.inputs[key] !== undefined && testNode.inputs[key] !== null) {
+        return testNode.inputs[key];
+      }
+
+      // 2. Local Effective Calculation / Override
+      if (testNode.effectiveOutputs[key] !== undefined && testNode.effectiveOutputs[key] !== null) {
+        return testNode.effectiveOutputs[key];
+      }
+
+      // 3. Project-Wide Traversal across all Lab Test modules
+      const proj = getProjectNode();
+      for (const modId in proj.labTests) {
+        const node = proj.labTests[modId];
+        if (node.effectiveOutputs[key] !== undefined && node.effectiveOutputs[key] !== null) {
+          return node.effectiveOutputs[key];
+        }
+      }
+
+      return null;
+    }
+
     function updateProjectId(val) {
-      ActiveRecord.projectId = val;
+      activeProjectId = val;
+      getProjectNode(activeProjectId);
       processAndRender();
     }
 
@@ -162,11 +220,13 @@
 
     // Save inputs currently on screen before navigating
     function commitCurrentInputs() {
+      if (!activeModule) return;
       const inputs = document.querySelectorAll('#app-viewport input[data-field-id]');
+      const testNode = getTestNode(activeModule.meta.id);
       inputs.forEach(input => {
         const fieldId = input.getAttribute('data-field-id');
         const numVal = input.value === '' ? null : parseFloat(input.value);
-        ActiveRecord.data[fieldId] = numVal;
+        testNode.inputs[fieldId] = numVal;
       });
     }
 
@@ -188,7 +248,7 @@
     }
 
     // =========================================================================
-    // 2. PROCESSING ENGINE
+    // 2. PROCESSING ENGINE & CALCULATION TRAVERSAL
     // =========================================================================
     const EngineOps = {
       ADD: (a, b) => a + b,
@@ -205,19 +265,26 @@
     function processRecord() {
       if (!activeModule || !activeModule.calculations) return;
 
+      const testNode = getTestNode(activeModule.meta.id);
+
       let evaluatedAny = false;
       do {
         evaluatedAny = false;
         activeModule.calculations.forEach(calc => {
-          const inputVals = calc.inputs.map(k => ActiveRecord.data[k] ?? null);
+          const inputVals = calc.inputs.map(k => getStoredValue(k));
           const hasAllInputs = inputVals.every(v => v !== null && !isNaN(v));
 
           if (hasAllInputs) {
             const rawResult = EngineOps[calc.op](...inputVals);
             const roundedResult = EngineOps.ROUND_AASHTO(rawResult, calc.precision);
 
-            if (ActiveRecord.data[calc.outputKey] !== roundedResult) {
-              ActiveRecord.data[calc.outputKey] = roundedResult;
+            if (testNode.calculatedOutputs[calc.outputKey] !== roundedResult) {
+              testNode.calculatedOutputs[calc.outputKey] = roundedResult;
+              
+              // Effective output resolves manual overrides first, then calculated results
+              testNode.effectiveOutputs[calc.outputKey] = 
+                testNode.manualOverrides[calc.outputKey] ?? roundedResult;
+                
               evaluatedAny = true;
             }
           }
@@ -226,13 +293,15 @@
     }
 
     function handleInputSilent(fieldId, value) {
-      const numVal = value === '' ? null : parseFloat(value);
-      ActiveRecord.data[fieldId] = numVal;
+      if (!activeModule) return;
+      const testNode = getTestNode(activeModule.meta.id);
+      testNode.inputs[fieldId] = value === '' ? null : parseFloat(value);
     }
 
     function handleInput(fieldId, value) {
-      const numVal = value === '' ? null : parseFloat(value);
-      ActiveRecord.data[fieldId] = numVal;
+      if (!activeModule) return;
+      const testNode = getTestNode(activeModule.meta.id);
+      testNode.inputs[fieldId] = value === '' ? null : parseFloat(value);
       
       // 1. Run engine math in memory
       processRecord();
@@ -240,12 +309,24 @@
       // 2. Patch calculated fields directly without re-rendering DOM
       document.querySelectorAll('[data-calc-field-id]').forEach(el => {
         const key = el.getAttribute('data-calc-field-id');
-        const calculatedVal = ActiveRecord.data[key];
+        const calculatedVal = getStoredValue(key);
         el.textContent = (calculatedVal !== null && calculatedVal !== undefined) ? calculatedVal : '--';
       });
     }
 
-    // Generic Missing Dependency Inspection Query
+    function handleManualOverride(key, providerModuleId, value) {
+      const numVal = value === '' ? null : parseFloat(value);
+      const targetModule = providerModuleId || activeModule.meta.id;
+      const testNode = getTestNode(targetModule);
+
+      // Store in parallel manual overrides
+      testNode.manualOverrides[key] = numVal;
+      testNode.effectiveOutputs[key] = numVal;
+
+      processAndRender();
+    }
+
+    // Structural Dependency Resolution Query
     function getMissingDependencies(outputKey) {
       if (!activeModule || !activeModule.calculations) return [];
 
@@ -254,22 +335,17 @@
 
       const missing = [];
       calc.inputs.forEach(inputKey => {
-        const val = ActiveRecord.data[inputKey];
+        const val = getStoredValue(inputKey);
         if (val === null || val === undefined || isNaN(val)) {
-          const fieldDef = activeModule.fields.find(f => f.id === inputKey) || { id: inputKey, label: inputKey };
+          // Find input definition in module fields
+          const fieldDef = activeModule.fields.find(f => f.id === inputKey) || { id: inputKey, label: inputKey, type: 'LOCAL' };
           
-          let sourceModuleId = null;
-          ModuleRegistry.forEach((mod, modId) => {
-            if (modId !== activeModule.meta.id && mod.fields.some(f => f.id === inputKey)) {
-              sourceModuleId = modId;
-            }
-          });
-
           missing.push({
             key: inputKey,
             label: fieldDef.label,
             unit: fieldDef.unit || 'val',
-            sourceModuleId: sourceModuleId
+            type: fieldDef.type || 'LOCAL',
+            providerModuleId: fieldDef.providerModuleId || null
           });
         }
       });
@@ -277,14 +353,32 @@
       return missing;
     }
 
-    // Generic Interactive Action Drawer for Uncalculated Fields
+    // Generic Action Resolver for Uncalculated Fields
     function handleMissingDependencyClick(outputKey) {
-      const calculatedVal = ActiveRecord.data[outputKey];
+      const calculatedVal = getStoredValue(outputKey);
       if (calculatedVal !== null && calculatedVal !== undefined) return;
 
       const missing = getMissingDependencies(outputKey);
       if (missing.length === 0) return;
 
+      // 1. Check if all missing dependencies are LOCAL inputs on current screen
+      const localMissing = missing.filter(dep => dep.type === 'LOCAL');
+      if (localMissing.length === missing.length) {
+        // Local Guard: Focus and highlight input boxes on screen
+        let focused = false;
+        localMissing.forEach(dep => {
+          const inputEl = document.querySelector(`input[data-field-id="${dep.key}"]`);
+          if (inputEl) {
+            inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            inputEl.classList.add('input-highlight');
+            if (!focused) { inputEl.focus(); focused = true; }
+            setTimeout(() => inputEl.classList.remove('input-highlight'), 2500);
+          }
+        });
+        return;
+      }
+
+      // 2. Handle EXTERNAL missing dependencies
       const calcEl = document.querySelector(`[data-calc-field-id="${outputKey}"]`);
       if (!calcEl) return;
       const parentCard = calcEl.closest('.speed-card, .card');
@@ -301,7 +395,7 @@
 
       let header = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
-          <span style="font-size:0.85rem; color:var(--text); font-weight:700;">⚠️ Uncalculated Dependency</span>
+          <span style="font-size:0.85rem; color:var(--text); font-weight:700;">⚠️ Uncalculated External Dependency</span>
           <button onclick="this.closest('.dependency-prompt').remove()" 
                   style="background:transparent; border:none; color:var(--muted); font-size:1.2rem; cursor:pointer; padding:0 0.3rem;">✕</button>
         </div>
@@ -309,24 +403,32 @@
 
       let body = '';
       missing.forEach(dep => {
-        body += `
-          <div style="font-size:0.85rem; color:var(--muted); margin-bottom:0.5rem;">
-            This calculation requires <strong>${dep.label}</strong>:
-          </div>
-          <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.75rem;">
-            <input type="number" inputmode="decimal" pattern="[0-9]*" placeholder="Enter manual ${dep.label}" 
-                   style="height:44px; font-size:0.95rem; flex:1;"
-                   onchange="handleInput('${dep.key}', this.value); promptBox.remove();" />
-          </div>
-        `;
+        if (dep.type === 'EXTERNAL') {
+          const isRegistered = dep.providerModuleId && ModuleRegistry.has(dep.providerModuleId);
 
-        if (dep.sourceModuleId && ModuleRegistry.has(dep.sourceModuleId)) {
-          const sourceMod = ModuleRegistry.get(dep.sourceModuleId);
           body += `
-            <button class="btn-action" style="height:40px; font-size:0.85rem; margin-bottom:0.5rem; width:100%;" 
-                    onclick="selectModule('${dep.sourceModuleId}')">
-              🔀 Run ${sourceMod.meta.title} →
-            </button>
+            <div style="font-size:0.85rem; color:var(--muted); margin-bottom:0.5rem;">
+              This calculation requires <strong>${dep.label}</strong>:
+            </div>
+          `;
+
+          if (isRegistered) {
+            const providerMod = ModuleRegistry.get(dep.providerModuleId);
+            body += `
+              <button class="btn-action" style="height:44px; font-size:0.9rem; margin-bottom:0.75rem; width:100%;" 
+                      onclick="selectModule('${dep.providerModuleId}')">
+                🔀 Launch ${providerMod.meta.title} →
+              </button>
+            `;
+          }
+
+          // Parallel Manual Override Input Option
+          body += `
+            <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.75rem;">
+              <input type="number" inputmode="decimal" pattern="[0-9]*" placeholder="Enter manual ${dep.label}" 
+                     style="height:44px; font-size:0.95rem; flex:1;"
+                     onchange="handleManualOverride('${dep.key}', '${dep.providerModuleId}', this.value); promptBox.remove();" />
+            </div>
           `;
         }
       });
@@ -377,7 +479,7 @@
             input.pattern = '[0-9]*';
             input.step = '0.1';
             input.setAttribute('data-field-id', comp.fieldId);
-            input.value = ActiveRecord.data[comp.fieldId] ?? '';
+            input.value = getStoredValue(comp.fieldId) ?? '';
             input.onchange = (e) => handleInputSilent(comp.fieldId, e.target.value);
             group.appendChild(input);
             card.appendChild(group);
@@ -393,7 +495,7 @@
           case 'value-display':
             const vBox = document.createElement('div');
             vBox.className = 'value-display';
-            const val = ActiveRecord.data[comp.fieldId] ?? '--';
+            const val = getStoredValue(comp.fieldId) ?? '--';
             vBox.innerHTML = `
               <div class="val" data-calc-field-id="${comp.fieldId}">${val}<span class="unit">${comp.unit}</span></div>
             `;
@@ -453,13 +555,13 @@
       const header = document.createElement('div');
       header.className = 'card-title';
       header.style.marginBottom = '0.75rem';
-      header.textContent = `Speed Mode Field Card (${ActiveRecord.projectId})`;
+      header.textContent = `Speed Mode Field Card (${activeProjectId})`;
       container.appendChild(header);
 
       activeModule.fields.forEach(f => {
         const card = document.createElement('div');
         card.className = 'speed-card';
-        let val = ActiveRecord.data[f.id] ?? '';
+        let val = getStoredValue(f.id) ?? '';
 
         if (f.computed) {
           card.innerHTML = `
