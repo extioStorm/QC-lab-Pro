@@ -2088,8 +2088,6 @@ function getResolvedValue(
 ) {
   const test = getCurrentTestRecord();
 
-  // 1. HIGHEST PRIORITY: Check if there is an explicit manual override or local input/output set in the current test.
-  // This ensures manual overrides for external/dependency fields (like manual Rice Gmm) are respected by the engine.
   if (test) {
     if (test.effectiveOutputs[key] !== undefined && test.effectiveOutputs[key] !== null) {
       return {
@@ -2111,7 +2109,6 @@ function getResolvedValue(
     }
   }
 
-  // 2. FALLBACK: Check declared dependencies if no local override exists
   if (
     !activeModule ||
     !activeModule.dependencies
@@ -2504,36 +2501,12 @@ function handleManualOverride(
 
   saveRecord(test);
 
-  // Force the engine to process calculations and update UI immediately
   processAndRender();
 }
 
 
 /* =========================================================================
    17. BACKWARD DEPENDENCY TRACING
-   =========================================================================
-   
-   This is intentionally separate from the normal calculation engine.
-
-   Normal engine direction:
-
-       inputs → calculations → outputs
-
-   Navigation direction:
-
-       desired output
-            ↓
-       producing calculation
-            ↓
-       its inputs
-            ↓
-       calculated inputs recurse
-            ↓
-       leaf inputs / external dependencies
-
-   This is only invoked when the technician asks the system to find what is
-   missing. It does NOT automatically drag the user backward through the
-   entire procedure every time a value is missing.
    ========================================================================= */
 
 function traceBackwardDependencies(
@@ -2739,6 +2712,15 @@ function getMissingDependencies(
    19. MISSING DEPENDENCY UI
    ========================================================================= */
 
+function submitManualDependency(key, buttonElement) {
+  const container = buttonElement.closest('.dependency-choice');
+  const input = container.querySelector(`[data-manual-dependency-key="${key}"]`);
+  if (!input) return;
+  handleManualOverride(key, input.value);
+  const box = buttonElement.closest('.dependency-box');
+  if (box) box.remove();
+}
+
 function handleMissingDependencyClick(
   outputKey
 ) {
@@ -2818,10 +2800,6 @@ function handleMissingDependencyClick(
     </div>
   `;
 
-  /*
-   * Show the dependency chain the system found.
-   */
-
   if (
     trace &&
     trace.leaves.length
@@ -2850,10 +2828,6 @@ function handleMissingDependencyClick(
       }
     );
   }
-
-  /*
-   * Each leaf gets its own resolution options.
-   */
 
   missing.forEach(
     dep => {
@@ -2931,11 +2905,6 @@ function handleMissingDependencyClick(
         `;
       }
 
-      /*
-       * This is the existing manual-entry escape hatch.
-       * We deliberately do NOT force recursive navigation.
-       */
-
       html += `
         <div class="dependency-choice">
 
@@ -2950,19 +2919,7 @@ function handleMissingDependencyClick(
           <button
             class="btn-action"
             style="height:44px;font-size:0.9rem;width:100%;"
-            onclick="
-              const input =
-                this.parentElement.querySelector(
-                  '[data-manual-dependency-key="${dep.key}"]'
-                );
-
-              handleManualOverride(
-                '${dep.key}',
-                input.value
-              );
-
-              this.closest('.dependency-box').remove();
-            ">
+            onclick="submitManualDependency('${dep.key}', this)">
             Enter Value Manually
           </button>
 
@@ -3633,217 +3590,3 @@ function renderSpeedMode(
           <div class="speed-card-main">
 
             <div class="speed-info">
-
-              <div class="speed-label">
-                ${field.label}
-              </div>
-
-              <div class="speed-type">
-                ${field.external
-                  ? "Dependency"
-                  : "Calculated"}
-                (${field.unit || "val"})
-              </div>
-
-            </div>
-
-            <div
-              class="speed-calc-val"
-              data-calc-field-id="${field.id}">
-              ${value !== "" ? value : "--"}
-            </div>
-
-          </div>
-        `;
-
-        const valueElement =
-          card.querySelector(
-            "[data-calc-field-id]"
-          );
-
-        valueElement.onclick =
-          () =>
-            handleMissingDependencyClick(
-              field.id
-            );
-
-        registerRenderedField(
-          field.id,
-          valueElement
-        );
-
-      } else {
-
-        card.innerHTML = `
-          <div class="speed-card-main">
-
-            <div class="speed-info">
-
-              <div class="speed-label">
-                ${field.label}
-              </div>
-
-              <div class="speed-type">
-                Input (${field.unit || "val"})
-              </div>
-
-            </div>
-
-            <div class="speed-input-wrap">
-
-              <input
-                type="number"
-                inputmode="decimal"
-                step="any"
-                data-field-id="${field.id}"
-                value="${value}"
-              >
-
-            </div>
-
-          </div>
-        `;
-
-        const input =
-          card.querySelector(
-            "input[data-field-id]"
-          );
-
-        input.onchange =
-          e =>
-            handleInput(
-              field.id,
-              e.target.value
-            );
-
-        registerRenderedField(
-          field.id,
-          input
-        );
-      }
-
-      container.appendChild(
-        card
-      );
-    }
-  );
-}
-
-
-function renderTrainingMode(
-  container
-) {
-
-  renderInteractiveMode(
-    container
-  );
-
-  const step =
-    activeModule.steps[
-      currentStepIndex
-    ];
-
-  if (
-    step?.trainingText
-  ) {
-
-    const card =
-      document.createElement(
-        "div"
-      );
-
-    card.className =
-      "card";
-
-    card.style.borderColor =
-      "var(--accent)";
-
-    const title =
-      document.createElement(
-        "div"
-      );
-
-    title.className =
-      "card-title";
-
-    title.style.color =
-      "var(--accent)";
-
-    title.textContent =
-      "Training Context";
-
-    const body =
-      document.createElement(
-        "div"
-      );
-
-    body.className =
-      "instruction";
-
-    body.textContent =
-      step.trainingText;
-
-    card.appendChild(
-      title
-    );
-
-    card.appendChild(
-      body
-    );
-
-    container.appendChild(
-      card
-    );
-  }
-}
-
-
-/* =========================================================================
-   24. PROJECT ID
-   ========================================================================= */
-
-function updateProjectId(
-  value
-) {
-
-  const trimmed =
-    String(value || "")
-      .trim();
-
-  if (!trimmed) {
-    return;
-  }
-
-  commitCurrentInputs();
-
-  activeProjectId =
-    trimmed;
-
-  getProjectNode(
-    activeProjectId
-  );
-
-  processAndRender();
-
-  renderWorkdayNavigation();
-  renderNavigationPerspective();
-}
-
-
-/* =========================================================================
-   25. INITIALIZE
-   ========================================================================= */
-
-getProjectNode(
-  activeProjectId
-);
-
-renderNavigation();
-renderNavigationPerspective();
-
-</script>
-
-<script src="modules/gmb-density.js"></script>
-
-</body>
-</html>
