@@ -1,24 +1,25 @@
 // =========================================================================
 // MODULE: AASHTO T 166 (Bulk Specific Gravity of Compacted Asphalt - Gmb)
-// Order: A (Dry) -> C (Submerged) -> B (SSD)
+// Reordered: A (Dry) -> C (Submerged) -> B (SSD)
+// Declarative Dependency Structure: LOCAL vs EXTERNAL Inputs
 // =========================================================================
 
 const GmbDensityModule = {
   meta: {
     id: "gmb-density",
     title: "AASHTO T 166 (Gmb Core Density)",
-    version: "1.1.0",
+    version: "1.2.0",
     description: "Bulk Specific Gravity and % Compaction of compacted asphalt cores using SSD method."
   },
 
-  // 1. FIELD DEFINITIONS (Reordered to A -> C -> B for Speed Sheet)
+  // 1. FIELD DEFINITIONS WITH EXPLICIT DEPENDENCY CONTRACTS
   fields: [
-    { id: 'massAirA', label: 'A: Dry Specimen Mass in Air', unit: 'g' },
-    { id: 'massWaterC', label: 'C: Submerged Specimen Mass', unit: 'g' },
-    { id: 'massSsdB', label: 'B: SSD Mass in Air', unit: 'g' },
+    { id: 'massAirA', label: 'A: Dry Specimen Mass in Air', unit: 'g', type: 'LOCAL' },
+    { id: 'massWaterC', label: 'C: Submerged Specimen Mass', unit: 'g', type: 'LOCAL' },
+    { id: 'massSsdB', label: 'B: SSD Mass in Air', unit: 'g', type: 'LOCAL' },
     { id: 'volumeV', label: 'Specimen Volume (B - C)', unit: 'cm³', computed: true },
     { id: 'bulkGmb', label: 'Bulk Specific Gravity (Gmb)', unit: 'val', computed: true },
-    { id: 'targetRiceGmm', label: 'Target Max Gravity (Gmm)', unit: 'val' },
+    { id: 'targetRiceGmm', label: 'Target Max Gravity (Gmm)', unit: 'val', type: 'EXTERNAL', providerModuleId: 'gmm-density' },
     { id: 'compactionPercent', label: 'Compaction Degree (% Gmm)', unit: '%', computed: true }
   ],
 
@@ -54,7 +55,7 @@ const GmbDensityModule = {
     }
   ],
 
-  // 3. STEP WIZARD DEFINITIONS (Reordered to A -> C -> B)
+  // 3. STEP WIZARD DEFINITIONS
   steps: [
     {
       id: "step-a",
@@ -101,7 +102,6 @@ const GmbDensityModule = {
       trainingText: "% Compaction = (Gmb / Gmm) * 100. Target field compaction usually falls between 92.0% and 97.0% depending on state DOT specs.",
       components: [
         { type: "instruction", text: "Specify Maximum Theoretical Gravity (Gmm) reference value:" },
-        { type: "fallback-rice-input" },
         { type: "formula", expression: "% Compaction = (Gmb / Target Gmm) × 100" },
         { type: "value-display", fieldId: "compactionPercent", unit: "%" }
       ]
