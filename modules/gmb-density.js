@@ -3,29 +3,42 @@
 // Bulk Specific Gravity of Compacted Asphalt - Gmb
 //
 // Architecture:
-//   Prequel  = Core Obtaining / Preparation
-//   Dependency = Rice / Gmm Test from same Project
-//   Sequel    = Downstream procedure consuming T166 results
 //
-// This module declares relationships.
+//   Prequel
+//      Core Obtaining / Preparation
+//
+//   Dependency
+//      Rice / Gmm Test from same Project
+//
+//   Sequel
+//      Downstream procedure consuming T166 results
+//
+// The module declares relationships.
 // It does not search the database itself.
 // =========================================================================
 
 const GmbDensityModule = {
 
   meta: {
+
     id: "gmb-density",
 
-    title: "AASHTO T 166 (Gmb Core Density)",
+    title:
+      "AASHTO T 166 (Gmb Core Density)",
 
-    shortTitle: "Gmb / T166",
+    shortTitle:
+      "Gmb / T166",
 
-    version: "2.0.0",
+    version:
+      "2.1.0",
 
     description:
       "Bulk Specific Gravity and percent density of a compacted asphalt core.",
 
+    // ---------------------------------------------------------------
     // PROCEDURAL WORKFLOW
+    // ---------------------------------------------------------------
+
     prequels: [
       "core-obtaining-preparation"
     ],
@@ -40,30 +53,33 @@ const GmbDensityModule = {
   // DEPENDENCIES
   // =========================================================================
   //
-  // This is deliberately NOT a random value lookup.
+  // T166 requires a Gmm value from a Rice Test.
   //
-  // T166 says:
+  // The module does NOT search for that test.
   //
-  // "I require Gmm from a Rice Test belonging to the same Project."
-  //
-  // The relationship resolver in index.html determines which Rice Test
-  // supplies the value.
+  // index.html owns dependency resolution.
   // =========================================================================
 
   dependencies: [
 
     {
-      id: "dependency-gmm",
+      id:
+        "dependency-gmm",
 
-      valueKey: "targetRiceGmm",
+      valueKey:
+        "targetRiceGmm",
 
-      label: "Rice Test Gmm",
+      label:
+        "Rice Test Gmm",
 
-      providerModuleId: "rice-test",
+      providerModuleId:
+        "rice-test",
 
-      relationship: "SAME_PROJECT",
+      relationship:
+        "SAME_PROJECT",
 
-      selection: "MOST_RECENT"
+      selection:
+        "MOST_RECENT"
     }
 
   ],
@@ -76,60 +92,125 @@ const GmbDensityModule = {
   fields: [
 
     {
-      id: "massAirA",
-      label: "A: Dry Specimen Mass in Air",
-      unit: "g",
-      type: "LOCAL"
+      id:
+        "massAirA",
+
+      label:
+        "A: Dry Specimen Mass in Air",
+
+      unit:
+        "g",
+
+      type:
+        "LOCAL"
     },
 
-    {
-      id: "massWaterC",
-      label: "C: Submerged Specimen Mass",
-      unit: "g",
-      type: "LOCAL"
-    },
 
     {
-      id: "massSsdB",
-      label: "B: SSD Mass in Air",
-      unit: "g",
-      type: "LOCAL"
+      id:
+        "massWaterC",
+
+      label:
+        "C: Submerged Specimen Mass",
+
+      unit:
+        "g",
+
+      type:
+        "LOCAL"
     },
 
-    {
-      id: "volumeV",
-      label: "Specimen Volume (B - C)",
-      unit: "cm³",
-      computed: true
-    },
 
     {
-      id: "bulkGmb",
-      label: "Bulk Specific Gravity (Gmb)",
-      unit: "val",
-      computed: true
+      id:
+        "massSsdB",
+
+      label:
+        "B: SSD Mass in Air",
+
+      unit:
+        "g",
+
+      type:
+        "LOCAL"
     },
 
-    {
-      id: "targetRiceGmm",
-      label: "Rice Test Gmm",
-      unit: "val",
-      computed: false,
-      external: true
-    },
 
     {
-      id: "compactionRatioTemp",
-      label: "Gmb / Gmm",
-      unit: "ratio",
-      computed: true
+      id:
+        "volumeV",
+
+      label:
+        "Specimen Volume (B - C)",
+
+      unit:
+        "cm³",
+
+      computed:
+        true
     },
 
+
     {
-      id: "compactionPercent",
-      label: "Percent Density",
-      unit: "%",
-      computed: true
+      id:
+        "bulkGmb",
+
+      label:
+        "Bulk Specific Gravity (Gmb)",
+
+      unit:
+        "val",
+
+      computed:
+        true
+    },
+
+
+    {
+      id:
+        "targetRiceGmm",
+
+      label:
+        "Rice Test Gmm",
+
+      unit:
+        "val",
+
+      computed:
+        false,
+
+      external:
+        true
+    },
+
+
+    {
+      id:
+        "compactionRatioTemp",
+
+      label:
+        "Gmb / Gmm",
+
+      unit:
+        "ratio",
+
+      computed:
+        true
+    },
+
+
+    {
+      id:
+        "compactionPercent",
+
+      label:
+        "Percent Density",
+
+      unit:
+        "%",
+
+      computed:
+        true
     }
 
   ],
@@ -142,66 +223,82 @@ const GmbDensityModule = {
   calculations: [
 
     {
-      id: "calc-volume",
+      id:
+        "calc-volume",
 
-      op: "SUBTRACT",
+      op:
+        "SUBTRACT",
 
       inputs: [
         "massSsdB",
         "massWaterC"
       ],
 
-      outputKey: "volumeV",
+      outputKey:
+        "volumeV",
 
-      precision: 1
+      precision:
+        1
     },
 
 
     {
-      id: "calc-gmb",
+      id:
+        "calc-gmb",
 
-      op: "DIVIDE",
+      op:
+        "DIVIDE",
 
       inputs: [
         "massAirA",
         "volumeV"
       ],
 
-      outputKey: "bulkGmb",
+      outputKey:
+        "bulkGmb",
 
-      precision: 3
+      precision:
+        3
     },
 
 
     {
-      id: "calc-compaction-ratio",
+      id:
+        "calc-compaction-ratio",
 
-      op: "DIVIDE",
+      op:
+        "DIVIDE",
 
       inputs: [
         "bulkGmb",
         "targetRiceGmm"
       ],
 
-      outputKey: "compactionRatioTemp",
+      outputKey:
+        "compactionRatioTemp",
 
-      precision: 5
+      precision:
+        5
     },
 
 
     {
-      id: "calc-compaction-percent",
+      id:
+        "calc-compaction-percent",
 
-      op: "MULTIPLY",
+      op:
+        "MULTIPLY",
 
       inputs: [
         "compactionRatioTemp",
         100
       ],
 
-      outputKey: "compactionPercent",
+      outputKey:
+        "compactionPercent",
 
-      precision: 1
+      precision:
+        1
     }
 
   ],
@@ -214,9 +311,11 @@ const GmbDensityModule = {
   steps: [
 
     {
-      id: "step-a",
+      id:
+        "step-a",
 
-      title: "Dry Specimen Mass in Air (A)",
+      title:
+        "Dry Specimen Mass in Air (A)",
 
       trainingText:
         "Record the dry specimen mass in air after the specimen has been properly prepared and cooled.",
@@ -224,21 +323,26 @@ const GmbDensityModule = {
       components: [
 
         {
-          type: "instruction",
+          type:
+            "instruction",
 
           text:
             "Weigh the prepared dry specimen in air and record mass A."
         },
 
-        {
-          type: "field-input",
 
-          fieldId: "massAirA",
+        {
+          type:
+            "field-input",
+
+          fieldId:
+            "massAirA",
 
           label:
             "Dry Specimen Mass in Air (A)",
 
-          unit: "g"
+          unit:
+            "g"
         }
 
       ]
@@ -246,9 +350,11 @@ const GmbDensityModule = {
 
 
     {
-      id: "step-c",
+      id:
+        "step-c",
 
-      title: "Submerged Specimen Mass (C)",
+      title:
+        "Submerged Specimen Mass (C)",
 
       trainingText:
         "Place the specimen in the water bath and obtain the submerged mass according to the applicable procedure.",
@@ -256,21 +362,26 @@ const GmbDensityModule = {
       components: [
 
         {
-          type: "instruction",
+          type:
+            "instruction",
 
           text:
             "Completely immerse the specimen and record submerged mass C."
         },
 
-        {
-          type: "field-input",
 
-          fieldId: "massWaterC",
+        {
+          type:
+            "field-input",
+
+          fieldId:
+            "massWaterC",
 
           label:
             "Submerged Specimen Mass (C)",
 
-          unit: "g"
+          unit:
+            "g"
         }
 
       ]
@@ -278,9 +389,11 @@ const GmbDensityModule = {
 
 
     {
-      id: "step-b",
+      id:
+        "step-b",
 
-      title: "SSD Specimen Mass in Air (B)",
+      title:
+        "SSD Specimen Mass in Air (B)",
 
       trainingText:
         "Bring the specimen to the required SSD condition and obtain its mass in air.",
@@ -288,21 +401,26 @@ const GmbDensityModule = {
       components: [
 
         {
-          type: "instruction",
+          type:
+            "instruction",
 
           text:
             "Remove the specimen, prepare its surface to the required SSD condition, and record mass B."
         },
 
-        {
-          type: "field-input",
 
-          fieldId: "massSsdB",
+        {
+          type:
+            "field-input",
+
+          fieldId:
+            "massSsdB",
 
           label:
             "SSD Mass in Air (B)",
 
-          unit: "g"
+          unit:
+            "g"
         }
 
       ]
@@ -310,7 +428,8 @@ const GmbDensityModule = {
 
 
     {
-      id: "step-volume-gmb",
+      id:
+        "step-volume-gmb",
 
       title:
         "Volume & Bulk Specific Gravity (Gmb)",
@@ -321,40 +440,53 @@ const GmbDensityModule = {
       components: [
 
         {
-          type: "instruction",
+          type:
+            "instruction",
 
           text:
             "The engine preserves the intermediate calculation before determining Gmb."
         },
 
+
         {
-          type: "formula",
+          type:
+            "formula",
 
           expression:
             "Volume = B - C"
         },
 
+
         {
-          type: "value-display",
+          type:
+            "value-display",
 
-          fieldId: "volumeV",
+          fieldId:
+            "volumeV",
 
-          unit: "cm³"
+          unit:
+            "cm³"
         },
 
+
         {
-          type: "formula",
+          type:
+            "formula",
 
           expression:
             "Gmb = A / Volume"
         },
 
+
         {
-          type: "value-display",
+          type:
+            "value-display",
 
-          fieldId: "bulkGmb",
+          fieldId:
+            "bulkGmb",
 
-          unit: ""
+          unit:
+            ""
         }
 
       ]
@@ -362,7 +494,8 @@ const GmbDensityModule = {
 
 
     {
-      id: "step-compaction",
+      id:
+        "step-compaction",
 
       title:
         "Percent Density",
@@ -373,41 +506,56 @@ const GmbDensityModule = {
       components: [
 
         {
-          type: "instruction",
+          type:
+            "instruction",
 
           text:
             "The required Gmm comes from the declared Rice Test dependency for this Project."
         },
 
+
         {
-          type: "formula",
+          type:
+            "formula",
 
           expression:
             "Gmb / Gmm × 100"
         },
 
+
         {
-          type: "value-display",
+          type:
+            "value-display",
 
-          fieldId: "targetRiceGmm",
+          fieldId:
+            "targetRiceGmm",
 
-          unit: ""
+          unit:
+            ""
         },
 
+
         {
-          type: "value-display",
+          type:
+            "value-display",
 
-          fieldId: "compactionRatioTemp",
+          fieldId:
+            "compactionRatioTemp",
 
-          unit: ""
+          unit:
+            ""
         },
 
+
         {
-          type: "value-display",
+          type:
+            "value-display",
 
-          fieldId: "compactionPercent",
+          fieldId:
+            "compactionPercent",
 
-          unit: "%"
+          unit:
+            "%"
         }
 
       ]
@@ -422,6 +570,12 @@ const GmbDensityModule = {
 // REGISTER MODULE
 // =========================================================================
 
-if (typeof registerModule === "function") {
-  registerModule(GmbDensityModule);
+if (
+  typeof registerModule ===
+  "function"
+) {
+
+  registerModule(
+    GmbDensityModule
+  );
 }
