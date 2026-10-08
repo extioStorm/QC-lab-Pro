@@ -2518,7 +2518,19 @@ function handleManualOverride(
   processAndRender();
 }
 
+function clearManualOverride(key) {
+  const test = getCurrentTestRecord();
+  if (!test) return;
 
+  // Clear the manual override and effective outputs for this key
+  delete test.manualOverrides[key];
+  delete test.effectiveOutputs[key];
+  delete test.provenance[key];
+
+  saveRecord(test);
+  processAndRender();
+}
+  
 /* =========================================================================
    17. BACKWARD DEPENDENCY TRACING
    ========================================================================= */
@@ -2735,219 +2747,97 @@ function submitManualDependency(key, buttonElement) {
   if (box) box.remove();
 }
 
-function handleMissingDependencyClick(
-  outputKey
-) {
+function handleMissingDependencyClick(outputKey) {
+  const test = getCurrentTestRecord();
+  const hasManualOverride = test && test.manualOverrides && test.manualOverrides[outputKey] !== undefined;
 
-  const resolved =
-    getResolvedValue(
-      outputKey
-    );
+  const parentEl = document.querySelector(`[data-calc-field-id="${outputKey}"]`)?.closest(".speed-card, .card");
+  if (!parentEl) return;
 
-  if (
-    resolved &&
-    resolved.value !== null &&
-    resolved.value !== undefined
-  ) {
-
+  // Toggle/remove existing dependency box if already open
+  const existingBox = parentEl.querySelector(".dependency-box");
+  if (existingBox) {
+    existingBox.remove();
     return;
   }
 
-  const missing =
-    getMissingDependencies(
-      outputKey
-    );
+  const box = document.createElement("div");
+  box.className = "dependency-box";
 
-  if (
-    missing.length === 0
-  ) {
-
-    return;
-  }
-
-  const calcEl =
-    document.querySelector(
-      `[data-calc-field-id="${outputKey}"]`
-    );
-
-  if (!calcEl) {
-    return;
-  }
-
-  const parent =
-    calcEl.closest(
-      ".speed-card, .card"
-    );
-
-  if (!parent) {
-    return;
-  }
-
-  const old =
-    parent.querySelector(
-      ".dependency-box"
-    );
-
-  if (old) {
-
-    old.remove();
-
-    return;
-  }
-
-  const box =
-    document.createElement(
-      "div"
-    );
-
-  box.className =
-    "dependency-box";
-
-  const trace =
-    traceBackwardDependencies(
-      outputKey
-    );
-
-  let html = `
-    <div class="dependency-title">
-      ⚠️ Missing Information
-    </div>
-  `;
-
-  if (
-    trace &&
-    trace.leaves.length
-  ) {
-
-    html += `
+  // IF IT HAS A MANUAL OVERRIDE ACTIVE: Give option to clear or update it
+  if (hasManualOverride) {
+    const currentValue = test.manualOverrides[outputKey];
+    box.innerHTML = `
+      <div class="dependency-title">⚙️ Manual Override Active</div>
       <div class="dependency-detail">
-        The system traced this calculation backward to
-        the information it actually needs:
+        This value is currently set manually to <strong>${currentValue}</strong> instead of using the automatic calculation/dependency.
+      </div>
+      <div class="dependency-choice">
+        <button class="btn-action" style="height:44px;font-size:0.9rem;width:100%;background:var(--danger);color:white;border:none;"
+          onclick="clearManualOverride('${outputKey}'); this.closest('.dependency-box').remove();">
+          Revert to Auto-Calculated Value
+        </button>
       </div>
     `;
-
-    trace.leaves.forEach(
-      leaf => {
-
-        const pathText =
-          leaf.path.join(
-            " → "
-          );
-
-        html += `
-          <div class="dependency-path">
-            ${pathText}
-          </div>
-        `;
-      }
-    );
+    parentEl.appendChild(box);
+    return;
   }
 
-  missing.forEach(
-    dep => {
+  // OTHERWISE: Fall back to your existing missing dependency logic
+  const resolved = getResolvedValue(outputKey);
+  if (resolved && resolved.value !== null && resolved.value !== undefined) {
+    return; // It's valid and auto-calculated, no action needed on click
+  }
 
-      html += `
-        <div class="dependency-detail">
-          Missing:
-          <strong>${dep.label}</strong>
-        </div>
-      `;
+  const missing = getMissingDependencies(outputKey);
+  if (missing.length === 0) return;
 
-      if (
-        dep.type === "LOCAL"
-      ) {
+  const trace = traceBackwardDependencies(outputKey);
 
-        html += `
-          <div class="dependency-choice">
+  let html = `<div class="dependency-title">⚠️ Missing Information</div>`;
+  if (trace && trace.leaves.length) {
+    html += `<div class="dependency-detail">The system traced this calculation backward to the information it actually needs:</div>`;
+    trace.leaves.forEach(leaf => {
+      html += `<div class="dependency-path">${leaf.path.join(" → ")}</div>`;
+    });
+  }
 
-            <button
-              class="btn-action"
-              style="height:44px;font-size:0.9rem;width:100%;"
-              onclick="
-                navigateToField(
-                  '${dep.key}',
-                  '${activeModule.meta.id}'
-                );
-                this.closest('.dependency-box').remove();
-              ">
-              Find / Enter ${dep.label}
-            </button>
-
-            <div class="dependency-detail">
-              This is a local input for the current test.
-            </div>
-
-          </div>
-        `;
-
-        return;
-      }
-
-      const providerId =
-        dep.dependency
-          ?.providerModuleId;
-
-      const provider =
-        providerId &&
-        ModuleRegistry.get(
-          providerId
-        );
-
-      html += `
-        <div class="dependency-detail">
-          Requires
-          <strong>${dep.label}</strong>
-          from the declared provider:
-          <strong>
-            ${provider?.meta?.title || providerId || "Not installed"}
-          </strong>.
-        </div>
-      `;
-
-      if (provider) {
-
-        html += `
-          <button
-            class="btn-action"
-            style="height:44px;font-size:0.9rem;width:100%;"
-            onclick="
-              selectModule('${providerId}');
-              this.closest('.dependency-box').remove();
-            ">
-            Find / Complete Dependency →
-          </button>
-        `;
-      }
-
+  missing.forEach(dep => {
+    html += `<div class="dependency-detail">Missing: <strong>${dep.label}</strong></div>`;
+    if (dep.type === "LOCAL") {
       html += `
         <div class="dependency-choice">
-
-          <input
-            type="number"
-            inputmode="decimal"
-            step="any"
-            placeholder="Enter ${dep.label} manually"
-            style="height:44px;font-size:0.95rem;"
-            data-manual-dependency-key="${dep.key}">
-
-          <button
-            class="btn-action"
-            style="height:44px;font-size:0.9rem;width:100%;"
-            onclick="submitManualDependency('${dep.key}', this)">
-            Enter Value Manually
+          <button class="btn-action" style="height:44px;font-size:0.9rem;width:100%;"
+            onclick="navigateToField('${dep.key}', '${activeModule.meta.id}'); this.closest('.dependency-box').remove();">
+            Find / Enter ${dep.label}
           </button>
-
-        </div>
-      `;
+        </div>`;
+      return;
     }
-  );
 
-  box.innerHTML =
-    html;
+    const providerId = dep.dependency?.providerModuleId;
+    const provider = providerId && ModuleRegistry.get(providerId);
 
-  parent.appendChild(
-    box
-  );
+    html += `<div class="dependency-detail">Requires <strong>${dep.label}</strong> from provider: <strong>${provider?.meta?.title || providerId}</strong>.</div>`;
+    if (provider) {
+      html += `
+        <button class="btn-action" style="height:44px;font-size:0.9rem;width:100%;"
+          onclick="selectModule('${providerId}'); this.closest('.dependency-box').remove();">
+            Find / Complete Dependency →
+          </button>`;
+    }
+
+    html += `
+      <div class="dependency-choice">
+        <input type="number" inputmode="decimal" step="any" placeholder="Enter ${dep.label} manually" style="height:44px;font-size:0.95rem;" data-manual-dependency-key="${dep.key}">
+        <button class="btn-action" style="height:44px;font-size:0.9rem;width:100%;" onclick="submitManualDependency('${dep.key}', this)">
+          Enter Value Manually
+        </button>
+      </div>`;
+  });
+
+  box.innerHTML = html;
+  parentEl.appendChild(box);
 }
 
 
