@@ -20,6 +20,20 @@
       --input-bg: #090a0c;
     }
 
+    /* --- MANUAL OVERRIDE ACCESSIBILITY STYLING --- */
+    .value-display.is-manual {
+      border-color: var(--warning) !important;
+      background: rgba(214, 158, 46, 0.08) !important;
+    }
+
+    .value-display.is-manual .val {
+      color: var(--warning) !important;
+    }
+
+    .speed-calc-val.is-manual {
+      color: var(--warning) !important;
+    }
+    
     * {
       box-sizing: border-box;
       margin: 0;
@@ -365,7 +379,7 @@
       color: #9ecbff;
     }
 
-    .value-display {
+    . {
       background: #0d1117;
       border: 1px solid var(--panel-border);
       padding: 1.25rem;
@@ -3281,17 +3295,23 @@ function renderInteractiveMode(
           break;
         }
 
-
         case "value-display": {
 
-          const resolved =
+            const resolved =
             getResolvedValue(
               comp.fieldId
             );
 
-          const value =
+          const rawValue =
             resolved?.value ??
             "--";
+
+          // Check specifically for manual overrides in the test record
+          const testRecord = getCurrentTestRecord();
+          const hasManualOverride = testRecord && testRecord.manualOverrides && testRecord.manualOverrides[comp.fieldId] !== undefined;
+
+          // Append an asterisk for accessibility if it's manually overridden
+          const displayValue = rawValue !== "--" && hasManualOverride ? `${rawValue} *` : rawValue;
 
           const box =
             document.createElement(
@@ -3300,6 +3320,10 @@ function renderInteractiveMode(
 
           box.className =
             "value-display";
+          
+          if (hasManualOverride) {
+            box.classList.add("is-manual");
+          }
 
           const valueElement =
             document.createElement(
@@ -3315,7 +3339,7 @@ function renderInteractiveMode(
           );
 
           valueElement.textContent =
-            value;
+            displayValue;
 
           const unit =
             document.createElement(
@@ -3581,10 +3605,14 @@ function renderSpeedMode(
       const value =
         resolved?.value ?? "";
 
-      if (
+if (
         field.computed ||
         field.external
       ) {
+        const testRecord = getCurrentTestRecord();
+        const hasManualOverride = testRecord && testRecord.manualOverrides && testRecord.manualOverrides[field.id] !== undefined;
+        const displayValue = value !== "" && hasManualOverride ? `${value} *` : (value !== "" ? value : "--");
+        const manualClass = hasManualOverride ? "is-manual" : "";
 
         card.innerHTML = `
           <div class="speed-card-main">
@@ -3599,15 +3627,15 @@ function renderSpeedMode(
                 ${field.external
                   ? "Dependency"
                   : "Calculated"}
-                (${field.unit || "val"})
+                (${field.unit || "val"}) ${hasManualOverride ? '• [Manual Override]' : ''}
               </div>
 
             </div>
 
             <div
-              class="speed-calc-val"
+              class="speed-calc-val ${manualClass}"
               data-calc-field-id="${field.id}">
-              ${value !== "" ? value : "--"}
+              ${displayValue}
             </div>
 
           </div>
