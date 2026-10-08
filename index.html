@@ -20,20 +20,6 @@
       --input-bg: #090a0c;
     }
 
-    /* --- MANUAL OVERRIDE ACCESSIBILITY STYLING --- */
-    .value-display.is-manual {
-      border-color: var(--warning) !important;
-      background: rgba(214, 158, 46, 0.08) !important;
-    }
-
-    .value-display.is-manual .val {
-      color: var(--warning) !important;
-    }
-
-    .speed-calc-val.is-manual {
-      color: var(--warning) !important;
-    }
-    
     * {
       box-sizing: border-box;
       margin: 0;
@@ -747,11 +733,6 @@ function createTestRecord(testId, moduleId, parentRef) {
     calculatedOutputs: {},
     manualOverrides: {},
     effectiveOutputs: {},
-
-    // Explicit dependency state. Dependencies never masquerade as local inputs.
-    // Each dependency stores its automatic value, optional manual value, and
-    // an explicit flag selecting which value is active.
-    dependencyValues: {},
 
     calculationSteps: [],
 
@@ -1909,14 +1890,6 @@ function handleInputSilent(
 }
 
 
-/*
- * Live field editing deliberately does NOT call processAndRender().
- *
- * The input element is the editor, while the test record is the source of
- * truth. Rebuilding the viewport while the technician is typing destroys the
- * DOM input and repopulates it from stored state, which is what caused erased
- * values to appear to come back.
- */
 function handleInput(
   fieldId,
   value
@@ -1927,6 +1900,7 @@ function handleInput(
     value
   );
 
+  processRecord();
   patchCalculatedFields();
 }
 
@@ -1982,15 +1956,10 @@ function resolveSameProjectDependency(
       return;
     }
 
-    /*
-     * Automatic dependency propagation comes from the provider's calculated
-     * output first. effectiveOutputs is only a compatibility fallback for
-     * provider modules that publish a value without a calculation block.
-     */
     const value =
-      test.calculatedOutputs?.[dependency.valueKey] !== undefined
-        ? test.calculatedOutputs[dependency.valueKey]
-        : test.effectiveOutputs?.[dependency.valueKey];
+      test.effectiveOutputs?.[
+        dependency.valueKey
+      ];
 
     if (
       value === undefined ||
@@ -2011,6 +1980,10 @@ function resolveSameProjectDependency(
   ) {
     return null;
   }
+
+  /*
+   * Explicit selection rule.
+   */
 
   if (
     dependency.selection ===
@@ -2075,185 +2048,9 @@ function resolveSameProjectDependency(
    13. VALUE RESOLUTION
    ========================================================================= */
 
-function getDependencyDefinition(key) {
-
-  if (
-    !activeModule ||
-    !activeModule.dependencies
-  ) {
-    return null;
-  }
-
-  return activeModule.dependencies.find(
-    dependency =>
-      dependency.valueKey === key
-  ) || null;
-}
-
-
-function getDependencyStateKey(dependency) {
-
-  if (!dependency) {
-    return null;
-  }
-
-  /*
-   * T166 declares the external key targetRiceGmm. Persist the actual
-   * dependency object as riceGmm so its state is not confused with a local
-   * input or a calculated output alias.
-   *
-   * Future dependencies can declare stateKey explicitly.
-   */
-  if (dependency.stateKey) {
-    return dependency.stateKey;
-  }
-
-  if (dependency.valueKey === "targetRiceGmm") {
-    return "riceGmm";
-  }
-
-  return dependency.valueKey;
-}
-
-
-function getOrCreateDependencyState(key) {
-
-  const test =
-    getCurrentTestRecord();
-
-  const dependency =
-    getDependencyDefinition(key);
-
-  if (!test || !dependency) {
-    return null;
-  }
-
-  if (!test.dependencyValues) {
-    test.dependencyValues = {};
-  }
-
-  const stateKey =
-    getDependencyStateKey(dependency);
-
-  if (!test.dependencyValues[stateKey]) {
-    test.dependencyValues[stateKey] = {
-      autoValue: null,
-      manualValue: null,
-      useManual: false,
-      autoSource: null
-    };
-  }
-
-  const state =
-    test.dependencyValues[stateKey];
-
-  /* Defensive normalization for records created by older versions. */
-  if (state.autoValue === undefined) {
-    state.autoValue = null;
-  }
-
-  if (state.manualValue === undefined) {
-    state.manualValue = null;
-  }
-
-  if (state.useManual === undefined) {
-    state.useManual = false;
-  }
-
-  if (state.autoSource === undefined) {
-    state.autoSource = null;
-  }
-
-  return state;
-}
-
-
-function refreshDependencyAutoValue(key) {
-
-  const dependency =
-    getDependencyDefinition(key);
-
-  const state =
-    getOrCreateDependencyState(key);
-
-  if (!dependency || !state) {
-    return null;
-  }
-
-  const automatic =
-    resolveDependency(
-      dependency
-    );
-
-  state.autoValue =
-    automatic?.value ?? null;
-
-  state.autoSource =
-    automatic?.source ?? null;
-
-  return state;
-}
-
-
-function getDependencyResolvedValue(key) {
-
-  const state =
-    refreshDependencyAutoValue(key);
-
-  if (!state) {
-    return null;
-  }
-
-  if (state.useManual) {
-
-    if (
-      state.manualValue === null ||
-      state.manualValue === undefined ||
-      isNaN(state.manualValue)
-    ) {
-      return null;
-    }
-
-    return {
-      value: state.manualValue,
-      source: {
-        recordType: "MANUAL_DEPENDENCY",
-        key
-      }
-    };
-  }
-
-  if (
-    state.autoValue === null ||
-    state.autoValue === undefined ||
-    isNaN(state.autoValue)
-  ) {
-    return null;
-  }
-
-  return {
-    value: state.autoValue,
-    source: state.autoSource || {
-      recordType: "AUTO_DEPENDENCY",
-      key
-    }
-  };
-}
-
-
 function getLocalValue(
   key
 ) {
-
-  const dependency =
-    getDependencyDefinition(key);
-
-  if (dependency) {
-    return (
-      getDependencyResolvedValue(key)?.value ??
-      null
-    );
-  }
 
   const test =
     getCurrentTestRecord();
@@ -2289,38 +2086,21 @@ function getLocalValue(
 function getResolvedValue(
   key
 ) {
-
-  /*
-   * Declared dependencies are resolved through their own state object.
-   * They never become local inputs and never write themselves into an input
-   * field just because a dependency is missing.
-   */
-  const dependency =
-    getDependencyDefinition(key);
-
-  if (dependency) {
-    return getDependencyResolvedValue(key);
-  }
-
-  const test =
-    getCurrentTestRecord();
+  const test = getCurrentTestRecord();
 
   if (test) {
-
     if (test.effectiveOutputs[key] !== undefined && test.effectiveOutputs[key] !== null) {
       return {
         value: test.effectiveOutputs[key],
         source: { recordType: "EFFECTIVE_OUTPUT", testId: test.testId }
       };
     }
-
     if (test.manualOverrides[key] !== undefined && test.manualOverrides[key] !== null) {
       return {
         value: test.manualOverrides[key],
         source: { recordType: "MANUAL_OVERRIDE", testId: test.testId }
       };
     }
-
     if (test.inputs[key] !== undefined && test.inputs[key] !== null) {
       return {
         value: test.inputs[key],
@@ -2329,7 +2109,27 @@ function getResolvedValue(
     }
   }
 
-  return null;
+  if (
+    !activeModule ||
+    !activeModule.dependencies
+  ) {
+
+    return null;
+  }
+
+  const dependency =
+    activeModule.dependencies.find(
+      dep =>
+        dep.valueKey === key
+    );
+
+  if (!dependency) {
+    return null;
+  }
+
+  return resolveDependency(
+    dependency
+  );
 }
 
 
@@ -2503,10 +2303,18 @@ function processRecord() {
           calc.outputKey
         ] = roundedResult;
 
-        // Only overwrite effectiveOutput if a manual override is active (exists in effectiveOutputs or was explicitly set)
-        if (test.effectiveOutputs[calc.outputKey] === undefined) {
-          test.effectiveOutputs[calc.outputKey] = roundedResult;
-        }
+        const override =
+          test.manualOverrides[
+            calc.outputKey
+          ];
+
+        test.effectiveOutputs[
+          calc.outputKey
+        ] =
+          override !== undefined &&
+          override !== null
+            ? override
+            : roundedResult;
 
         /*
          * Preserve the calculation chain.
@@ -2646,24 +2454,18 @@ function calculationInputsAvailable(
   return true;
 }
 
+
 /* =========================================================================
-   16. MANUAL OVERRIDE (MEMORY & TOGGLE MODEL)
+   16. MANUAL OVERRIDE
    ========================================================================= */
 
-function setManualDependencyValue(key, value) {
-
-  const dependency =
-    getDependencyDefinition(key);
+function handleManualOverride(
+  key,
+  value
+) {
 
   const test =
     getCurrentTestRecord();
-
-  if (!dependency || !test) {
-    return;
-  }
-
-  const state =
-    getOrCreateDependencyState(key);
 
   const numericValue =
     value === ""
@@ -2674,76 +2476,32 @@ function setManualDependencyValue(key, value) {
     numericValue === null ||
     isNaN(numericValue)
   ) {
-    return;
-  }
-
-  state.manualValue =
-    numericValue;
-
-  state.useManual =
-    true;
-
-  saveRecord(test);
-  processAndRender();
-}
-
-
-function disableManualDependency(key) {
-
-  const test =
-    getCurrentTestRecord();
-
-  const state =
-    getOrCreateDependencyState(key);
-
-  if (!test || !state) {
-    return;
-  }
-
-  /* Keep manualValue. Only turn off the flag. */
-  state.useManual =
-    false;
-
-  saveRecord(test);
-  processAndRender();
-}
-
-
-function enableManualDependency(key) {
-
-  const test =
-    getCurrentTestRecord();
-
-  const state =
-    getOrCreateDependencyState(key);
-
-  if (!test || !state) {
-    return;
-  }
-
-  if (
-    state.manualValue === null ||
-    state.manualValue === undefined ||
-    isNaN(state.manualValue)
-  ) {
-    return;
-  }
-
-  state.useManual =
-    true;
-
-  saveRecord(test);
-  processAndRender();
-}
-
-
-function toggleManualDependency(key, turnOn) {
-
-  if (turnOn) {
-    enableManualDependency(key);
+    delete test.manualOverrides[key];
+    delete test.effectiveOutputs[key];
+    delete test.provenance[key];
   } else {
-    disableManualDependency(key);
+    test.manualOverrides[key] =
+      numericValue;
+
+    test.effectiveOutputs[key] =
+      numericValue;
+
+    test.provenance[key] = {
+
+      type:
+        "MANUAL_OVERRIDE",
+
+      enteredAt:
+        new Date().toISOString(),
+
+      source:
+        "USER_ENTERED"
+    };
   }
+
+  saveRecord(test);
+
+  processAndRender();
 }
 
 
@@ -2951,217 +2709,231 @@ function getMissingDependencies(
 
 
 /* =========================================================================
-   19. MISSING DEPENDENCY & TOGGLE UI
+   19. MISSING DEPENDENCY UI
    ========================================================================= */
 
 function submitManualDependency(key, buttonElement) {
-
-  const container =
-    buttonElement.closest('.dependency-choice');
-
-  const input =
-    container?.querySelector(
-      `[data-manual-dependency-key="${key}"]`
-    );
-
-  if (!input) {
-    return;
-  }
-
-  setManualDependencyValue(
-    key,
-    input.value
-  );
-
-  const box =
-    buttonElement.closest('.dependency-box');
-
-  if (box) {
-    box.remove();
-  }
+  const container = buttonElement.closest('.dependency-choice');
+  const input = container.querySelector(`[data-manual-dependency-key="${key}"]`);
+  if (!input) return;
+  handleManualOverride(key, input.value);
+  const box = buttonElement.closest('.dependency-box');
+  if (box) box.remove();
 }
 
+function handleMissingDependencyClick(
+  outputKey
+) {
 
-function handleMissingDependencyClick(outputKey) {
-
-  const dependency =
-    getDependencyDefinition(outputKey);
-
-  const parentEl =
-    document
-      .querySelector(
-        `[data-calc-field-id="${outputKey}"]`
-      )
-      ?.closest(".speed-card, .card");
-
-  if (!parentEl) {
-    return;
-  }
-
-  const existingBox =
-    parentEl.querySelector(".dependency-box");
-
-  if (existingBox) {
-    existingBox.remove();
-    return;
-  }
-
-  const box =
-    document.createElement("div");
-
-  box.className =
-    "dependency-box";
-
-  /*
-   * A declared dependency gets its own state object. The automatic value is
-   * refreshed from the provider, while the manual value is retained locally.
-   */
-  if (dependency) {
-
-    const state =
-      getOrCreateDependencyState(outputKey);
-
-    refreshDependencyAutoValue(outputKey);
-
-    const autoValue =
-      state?.autoValue ?? null;
-
-    const manualValue =
-      state?.manualValue ?? null;
-
-    const isActive =
-      state?.useManual === true;
-
-    const hasManual =
-      manualValue !== null &&
-      manualValue !== undefined &&
-      !isNaN(manualValue);
-
-    const autoText =
-      autoValue === null ||
-      autoValue === undefined
-        ? "Not available"
-        : autoValue;
-
-    box.innerHTML = `
-      <div class="dependency-title">⚙️ ${dependency.label}</div>
-      <div class="dependency-detail">
-        Automatic value: <strong>${autoText}</strong>
-        (${isActive ? "Manual override active" : "Automatic mode"})
-      </div>
-
-      ${hasManual ? `
-        <div class="dependency-detail">
-          Stored manual value: <strong>${manualValue}</strong>
-        </div>
-        <div class="dependency-choice" style="gap:0.5rem;">
-          ${isActive ? `
-            <button class="btn-action" style="height:40px;font-size:0.85rem;width:100%;background:var(--danger);color:white;border:none;"
-              onclick="disableManualDependency('${outputKey}'); this.closest('.dependency-box').remove();">
-              Turn Off Manual — Use Automatic
-            </button>
-          ` : `
-            <button class="btn-action" style="height:40px;font-size:0.85rem;width:100%;background:var(--success);color:white;border:none;"
-              onclick="enableManualDependency('${outputKey}'); this.closest('.dependency-box').remove();">
-              Turn On Manual Value (${manualValue})
-            </button>
-          `}
-          <div style="display:flex;gap:0.4rem;margin-top:0.4rem;">
-            <input type="number" inputmode="decimal" step="any" value="${manualValue}" style="height:38px;font-size:0.9rem;flex:1;" data-new-manual="${outputKey}">
-            <button class="btn-action" style="height:38px;font-size:0.85rem;padding:0 1rem;"
-              onclick="setManualDependencyValue('${outputKey}', this.previousElementSibling.value); this.closest('.dependency-box').remove();">
-              Update & Use
-            </button>
-          </div>
-        </div>
-      ` : `
-        <div class="dependency-choice">
-          <input type="number" inputmode="decimal" step="any" placeholder="Enter ${dependency.label} manually" style="height:44px;font-size:0.95rem;" data-manual-dependency-key="${outputKey}">
-          <button class="btn-action" style="height:44px;font-size:0.9rem;width:100%;" onclick="submitManualDependency('${outputKey}', this)">
-            Store & Use Manual Value
-          </button>
-        </div>
-      `}
-    `;
-
-    parentEl.appendChild(box);
-    return;
-  }
-
-  /* Existing non-dependency missing-information behavior remains separate. */
   const resolved =
-    getResolvedValue(outputKey);
+    getResolvedValue(
+      outputKey
+    );
 
   if (
     resolved &&
     resolved.value !== null &&
     resolved.value !== undefined
   ) {
+
     return;
   }
 
   const missing =
-    getMissingDependencies(outputKey);
+    getMissingDependencies(
+      outputKey
+    );
 
-  if (missing.length === 0) {
+  if (
+    missing.length === 0
+  ) {
+
     return;
   }
 
-  const trace =
-    traceBackwardDependencies(outputKey);
+  const calcEl =
+    document.querySelector(
+      `[data-calc-field-id="${outputKey}"]`
+    );
 
-  let html =
-    `<div class="dependency-title">⚠️ Missing Information</div>`;
-
-  if (trace && trace.leaves.length) {
-    html += `<div class="dependency-detail">The system traced this calculation backward to the information it actually needs:</div>`;
-    trace.leaves.forEach(leaf => {
-      html += `<div class="dependency-path">${leaf.path.join(" → ")}</div>`;
-    });
+  if (!calcEl) {
+    return;
   }
 
-  missing.forEach(dep => {
-    html += `<div class="dependency-detail">Missing: <strong>${dep.label}</strong></div>`;
+  const parent =
+    calcEl.closest(
+      ".speed-card, .card"
+    );
 
-    if (dep.type === "LOCAL") {
-      html += `
-        <div class="dependency-choice">
-          <button class="btn-action" style="height:44px;font-size:0.9rem;width:100%;"
-            onclick="navigateToField('${dep.key}', '${activeModule.meta.id}'); this.closest('.dependency-box').remove();">
-            Find / Enter ${dep.label}
-          </button>
-        </div>`;
-      return;
-    }
+  if (!parent) {
+    return;
+  }
 
-    const providerId =
-      dep.dependency?.providerModuleId;
+  const old =
+    parent.querySelector(
+      ".dependency-box"
+    );
 
-    const provider =
-      providerId &&
-      ModuleRegistry.get(providerId);
+  if (old) {
 
-    html += `<div class="dependency-detail">Requires <strong>${dep.label}</strong> from provider: <strong>${provider?.meta?.title || providerId}</strong>.</div>`;
+    old.remove();
 
-    if (provider) {
-      html += `
-        <button class="btn-action" style="height:44px;font-size:0.9rem;width:100%;"
-          onclick="selectModule('${providerId}'); this.closest('.dependency-box').remove();">
-          Find / Complete Dependency →
-        </button>`;
-    }
+    return;
+  }
+
+  const box =
+    document.createElement(
+      "div"
+    );
+
+  box.className =
+    "dependency-box";
+
+  const trace =
+    traceBackwardDependencies(
+      outputKey
+    );
+
+  let html = `
+    <div class="dependency-title">
+      ⚠️ Missing Information
+    </div>
+  `;
+
+  if (
+    trace &&
+    trace.leaves.length
+  ) {
 
     html += `
-      <div class="dependency-choice">
-        <input type="number" inputmode="decimal" step="any" placeholder="Enter ${dep.label} manually" style="height:44px;font-size:0.95rem;" data-manual-dependency-key="${dep.key}">
-        <button class="btn-action" style="height:44px;font-size:0.9rem;width:100%;" onclick="submitManualDependency('${dep.key}', this)">
-          Store & Use Manual Value
-        </button>
-      </div>`;
-  });
+      <div class="dependency-detail">
+        The system traced this calculation backward to
+        the information it actually needs:
+      </div>
+    `;
 
-  box.innerHTML = html;
-  parentEl.appendChild(box);
+    trace.leaves.forEach(
+      leaf => {
+
+        const pathText =
+          leaf.path.join(
+            " → "
+          );
+
+        html += `
+          <div class="dependency-path">
+            ${pathText}
+          </div>
+        `;
+      }
+    );
+  }
+
+  missing.forEach(
+    dep => {
+
+      html += `
+        <div class="dependency-detail">
+          Missing:
+          <strong>${dep.label}</strong>
+        </div>
+      `;
+
+      if (
+        dep.type === "LOCAL"
+      ) {
+
+        html += `
+          <div class="dependency-choice">
+
+            <button
+              class="btn-action"
+              style="height:44px;font-size:0.9rem;width:100%;"
+              onclick="
+                navigateToField(
+                  '${dep.key}',
+                  '${activeModule.meta.id}'
+                );
+                this.closest('.dependency-box').remove();
+              ">
+              Find / Enter ${dep.label}
+            </button>
+
+            <div class="dependency-detail">
+              This is a local input for the current test.
+            </div>
+
+          </div>
+        `;
+
+        return;
+      }
+
+      const providerId =
+        dep.dependency
+          ?.providerModuleId;
+
+      const provider =
+        providerId &&
+        ModuleRegistry.get(
+          providerId
+        );
+
+      html += `
+        <div class="dependency-detail">
+          Requires
+          <strong>${dep.label}</strong>
+          from the declared provider:
+          <strong>
+            ${provider?.meta?.title || providerId || "Not installed"}
+          </strong>.
+        </div>
+      `;
+
+      if (provider) {
+
+        html += `
+          <button
+            class="btn-action"
+            style="height:44px;font-size:0.9rem;width:100%;"
+            onclick="
+              selectModule('${providerId}');
+              this.closest('.dependency-box').remove();
+            ">
+            Find / Complete Dependency →
+          </button>
+        `;
+      }
+
+      html += `
+        <div class="dependency-choice">
+
+          <input
+            type="number"
+            inputmode="decimal"
+            step="any"
+            placeholder="Enter ${dep.label} manually"
+            style="height:44px;font-size:0.95rem;"
+            data-manual-dependency-key="${dep.key}">
+
+          <button
+            class="btn-action"
+            style="height:44px;font-size:0.9rem;width:100%;"
+            onclick="submitManualDependency('${dep.key}', this)">
+            Enter Value Manually
+          </button>
+
+        </div>
+      `;
+    }
+  );
+
+  box.innerHTML =
+    html;
+
+  parent.appendChild(
+    box
+  );
 }
 
 
@@ -3196,30 +2968,6 @@ function registerRenderedField(
 
     element
   });
-}
-
-
-function isManualValueActive(key) {
-
-  const dependency =
-    getDependencyDefinition(key);
-
-  if (dependency) {
-    return (
-      getOrCreateDependencyState(key)?.useManual === true
-    );
-  }
-
-  const test =
-    getCurrentTestRecord();
-
-  return !!(
-    test &&
-    test.effectiveOutputs &&
-    test.manualOverrides &&
-    test.effectiveOutputs[key] !== undefined &&
-    test.manualOverrides[key] !== undefined
-  );
 }
 
 
@@ -3484,7 +3232,7 @@ function renderInteractiveMode(
               ? ""
               : value;
 
-          input.oninput =
+          input.onchange =
             e =>
               handleInput(
                 comp.fieldId,
@@ -3533,6 +3281,7 @@ function renderInteractiveMode(
           break;
         }
 
+
         case "value-display": {
 
           const resolved =
@@ -3540,14 +3289,9 @@ function renderInteractiveMode(
               comp.fieldId
             );
 
-          const rawValue =
+          const value =
             resolved?.value ??
             "--";
-
-          const testRecord = getCurrentTestRecord();
-          const hasManualOverride = isManualValueActive(comp.fieldId);
-
-          const displayValue = rawValue !== "--" && hasManualOverride ? `${rawValue} *` : rawValue;
 
           const box =
             document.createElement(
@@ -3556,10 +3300,6 @@ function renderInteractiveMode(
 
           box.className =
             "value-display";
-          
-          if (hasManualOverride) {
-            box.classList.add("is-manual");
-          }
 
           const valueElement =
             document.createElement(
@@ -3575,7 +3315,7 @@ function renderInteractiveMode(
           );
 
           valueElement.textContent =
-            displayValue;
+            value;
 
           const unit =
             document.createElement(
@@ -3845,10 +3585,6 @@ function renderSpeedMode(
         field.computed ||
         field.external
       ) {
-        const testRecord = getCurrentTestRecord();
-        const hasManualOverride = isManualValueActive(field.id);
-        const displayValue = value !== "" && hasManualOverride ? `${value} *` : (value !== "" ? value : "--");
-        const manualClass = hasManualOverride ? "is-manual" : "";
 
         card.innerHTML = `
           <div class="speed-card-main">
@@ -3863,15 +3599,15 @@ function renderSpeedMode(
                 ${field.external
                   ? "Dependency"
                   : "Calculated"}
-                (${field.unit || "val"}) ${hasManualOverride ? '• [Manual Override]' : ''}
+                (${field.unit || "val"})
               </div>
 
             </div>
 
             <div
-              class="speed-calc-val ${manualClass}"
+              class="speed-calc-val"
               data-calc-field-id="${field.id}">
-              ${displayValue}
+              ${value !== "" ? value : "--"}
             </div>
 
           </div>
@@ -3930,7 +3666,7 @@ function renderSpeedMode(
             "input[data-field-id]"
           );
 
-        input.oninput =
+        input.onchange =
           e =>
             handleInput(
               field.id,
@@ -4036,9 +3772,6 @@ function updateProjectId(
   }
 
   commitCurrentInputs();
-
-  activeModule =
-    activeModule; // no-op safeguard
 
   activeProjectId =
     trimmed;
