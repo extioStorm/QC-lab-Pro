@@ -748,6 +748,11 @@ function createTestRecord(testId, moduleId, parentRef) {
     manualOverrides: {},
     effectiveOutputs: {},
 
+    // Explicit dependency state. Dependencies never masquerade as local inputs.
+    // Each dependency stores its automatic value, optional manual value, and
+    // an explicit flag selecting which value is active.
+    dependencyValues: {},
+
     calculationSteps: [],
 
     provenance: {},
@@ -1904,6 +1909,14 @@ function handleInputSilent(
 }
 
 
+/*
+ * Live field editing deliberately does NOT call processAndRender().
+ *
+ * The input element is the editor, while the test record is the source of
+ * truth. Rebuilding the viewport while the technician is typing destroys the
+ * DOM input and repopulates it from stored state, which is what caused erased
+ * values to appear to come back.
+ */
 function handleInput(
   fieldId,
   value
@@ -1914,7 +1927,6 @@ function handleInput(
     value
   );
 
-  processRecord();
   patchCalculatedFields();
 }
 
@@ -1970,10 +1982,15 @@ function resolveSameProjectDependency(
       return;
     }
 
+    /*
+     * Automatic dependency propagation comes from the provider's calculated
+     * output first. effectiveOutputs is only a compatibility fallback for
+     * provider modules that publish a value without a calculation block.
+     */
     const value =
-      test.effectiveOutputs?.[
-        dependency.valueKey
-      ];
+      test.calculatedOutputs?.[dependency.valueKey] !== undefined
+        ? test.calculatedOutputs[dependency.valueKey]
+        : test.effectiveOutputs?.[dependency.valueKey];
 
     if (
       value === undefined ||
@@ -1994,10 +2011,6 @@ function resolveSameProjectDependency(
   ) {
     return null;
   }
-
-  /*
-   * Explicit selection rule.
-   */
 
   if (
     dependency.selection ===
@@ -2062,9 +2075,185 @@ function resolveSameProjectDependency(
    13. VALUE RESOLUTION
    ========================================================================= */
 
+function getDependencyDefinition(key) {
+
+  if (
+    !activeModule ||
+    !activeModule.dependencies
+  ) {
+    return null;
+  }
+
+  return activeModule.dependencies.find(
+    dependency =>
+      dependency.valueKey === key
+  ) || null;
+}
+
+
+function getDependencyStateKey(dependency) {
+
+  if (!dependency) {
+    return null;
+  }
+
+  /*
+   * T166 declares the external key targetRiceGmm. Persist the actual
+   * dependency object as riceGmm so its state is not confused with a local
+   * input or a calculated output alias.
+   *
+   * Future dependencies can declare stateKey explicitly.
+   */
+  if (dependency.stateKey) {
+    return dependency.stateKey;
+  }
+
+  if (dependency.valueKey === "targetRiceGmm") {
+    return "riceGmm";
+  }
+
+  return dependency.valueKey;
+}
+
+
+function getOrCreateDependencyState(key) {
+
+  const test =
+    getCurrentTestRecord();
+
+  const dependency =
+    getDependencyDefinition(key);
+
+  if (!test || !dependency) {
+    return null;
+  }
+
+  if (!test.dependencyValues) {
+    test.dependencyValues = {};
+  }
+
+  const stateKey =
+    getDependencyStateKey(dependency);
+
+  if (!test.dependencyValues[stateKey]) {
+    test.dependencyValues[stateKey] = {
+      autoValue: null,
+      manualValue: null,
+      useManual: false,
+      autoSource: null
+    };
+  }
+
+  const state =
+    test.dependencyValues[stateKey];
+
+  /* Defensive normalization for records created by older versions. */
+  if (state.autoValue === undefined) {
+    state.autoValue = null;
+  }
+
+  if (state.manualValue === undefined) {
+    state.manualValue = null;
+  }
+
+  if (state.useManual === undefined) {
+    state.useManual = false;
+  }
+
+  if (state.autoSource === undefined) {
+    state.autoSource = null;
+  }
+
+  return state;
+}
+
+
+function refreshDependencyAutoValue(key) {
+
+  const dependency =
+    getDependencyDefinition(key);
+
+  const state =
+    getOrCreateDependencyState(key);
+
+  if (!dependency || !state) {
+    return null;
+  }
+
+  const automatic =
+    resolveDependency(
+      dependency
+    );
+
+  state.autoValue =
+    automatic?.value ?? null;
+
+  state.autoSource =
+    automatic?.source ?? null;
+
+  return state;
+}
+
+
+function getDependencyResolvedValue(key) {
+
+  const state =
+    refreshDependencyAutoValue(key);
+
+  if (!state) {
+    return null;
+  }
+
+  if (state.useManual) {
+
+    if (
+      state.manualValue === null ||
+      state.manualValue === undefined ||
+      isNaN(state.manualValue)
+    ) {
+      return null;
+    }
+
+    return {
+      value: state.manualValue,
+      source: {
+        recordType: "MANUAL_DEPENDENCY",
+        key
+      }
+    };
+  }
+
+  if (
+    state.autoValue === null ||
+    state.autoValue === undefined ||
+    isNaN(state.autoValue)
+  ) {
+    return null;
+  }
+
+  return {
+    value: state.autoValue,
+    source: state.autoSource || {
+      recordType: "AUTO_DEPENDENCY",
+      key
+    }
+  };
+}
+
+
 function getLocalValue(
   key
 ) {
+
+  const dependency =
+    getDependencyDefinition(key);
+
+  if (dependency) {
+    return (
+      getDependencyResolvedValue(key)?.value ??
+      null
+    );
+  }
 
   const test =
     getCurrentTestRecord();
@@ -2100,21 +2289,38 @@ function getLocalValue(
 function getResolvedValue(
   key
 ) {
-  const test = getCurrentTestRecord();
+
+  /*
+   * Declared dependencies are resolved through their own state object.
+   * They never become local inputs and never write themselves into an input
+   * field just because a dependency is missing.
+   */
+  const dependency =
+    getDependencyDefinition(key);
+
+  if (dependency) {
+    return getDependencyResolvedValue(key);
+  }
+
+  const test =
+    getCurrentTestRecord();
 
   if (test) {
+
     if (test.effectiveOutputs[key] !== undefined && test.effectiveOutputs[key] !== null) {
       return {
         value: test.effectiveOutputs[key],
         source: { recordType: "EFFECTIVE_OUTPUT", testId: test.testId }
       };
     }
+
     if (test.manualOverrides[key] !== undefined && test.manualOverrides[key] !== null) {
       return {
         value: test.manualOverrides[key],
         source: { recordType: "MANUAL_OVERRIDE", testId: test.testId }
       };
     }
+
     if (test.inputs[key] !== undefined && test.inputs[key] !== null) {
       return {
         value: test.inputs[key],
@@ -2123,27 +2329,7 @@ function getResolvedValue(
     }
   }
 
-  if (
-    !activeModule ||
-    !activeModule.dependencies
-  ) {
-
-    return null;
-  }
-
-  const dependency =
-    activeModule.dependencies.find(
-      dep =>
-        dep.valueKey === key
-    );
-
-  if (!dependency) {
-    return null;
-  }
-
-  return resolveDependency(
-    dependency
-  );
+  return null;
 }
 
 
@@ -2464,77 +2650,103 @@ function calculationInputsAvailable(
    16. MANUAL OVERRIDE (MEMORY & TOGGLE MODEL)
    ========================================================================= */
 
-function handleManualOverride(key, value) {
-  const test = getCurrentTestRecord();
-  const numericValue = value === "" ? null : parseFloat(value);
+function setManualDependencyValue(key, value) {
 
-  if (numericValue !== null && !isNaN(numericValue)) {
-    test.manualOverrides[key] = numericValue;
-    test.effectiveOutputs[key] = numericValue; // Turn on active override state
-    test.provenance[key] = {
-      type: "MANUAL_OVERRIDE",
-      enteredAt: new Date().toISOString(),
-      source: "USER_ENTERED"
-    };
+  const dependency =
+    getDependencyDefinition(key);
+
+  const test =
+    getCurrentTestRecord();
+
+  if (!dependency || !test) {
+    return;
   }
+
+  const state =
+    getOrCreateDependencyState(key);
+
+  const numericValue =
+    value === ""
+      ? null
+      : parseFloat(value);
+
+  if (
+    numericValue === null ||
+    isNaN(numericValue)
+  ) {
+    return;
+  }
+
+  state.manualValue =
+    numericValue;
+
+  state.useManual =
+    true;
 
   saveRecord(test);
   processAndRender();
 }
 
-function clearManualOverride(key) {
-  const test = getCurrentTestRecord();
-  if (!test) return;
 
-  // 1. Turn off active manual override
-  delete test.manualOverrides[key]; // Or keep it in memory if you want memory, but wait—you want memory! 
-  // Ah, earlier you said: "turn off use manual override flag, keep the value, and then it uses the auto filled."
-  // So we only delete effectiveOutputs[key], NOT manualOverrides[key]!
-  delete test.effectiveOutputs[key];
+function disableManualDependency(key) {
 
-  // 2. CLEAR STALE DOWNSTREAM CALCULATIONS so they don't freeze
-  // Find any calculation that depends on this key and wipe its output so it re-computes or shows --
-  if (activeModule && activeModule.calculations) {
-    activeModule.calculations.forEach(calc => {
-      if (calc.inputs.includes(key) || calc.outputKey === key) {
-        delete test.calculatedOutputs[calc.outputKey];
-        delete test.effectiveOutputs[calc.outputKey];
-      }
-    });
+  const test =
+    getCurrentTestRecord();
+
+  const state =
+    getOrCreateDependencyState(key);
+
+  if (!test || !state) {
+    return;
   }
+
+  /* Keep manualValue. Only turn off the flag. */
+  state.useManual =
+    false;
 
   saveRecord(test);
   processAndRender();
 }
 
-function reenableManualOverride(key) {
-  const test = getCurrentTestRecord();
-  if (!test) return;
 
-  // Turn back on using the stored manual value from memory
-  if (test.manualOverrides[key] !== undefined) {
-    test.effectiveOutputs[key] = test.manualOverrides[key];
+function enableManualDependency(key) {
+
+  const test =
+    getCurrentTestRecord();
+
+  const state =
+    getOrCreateDependencyState(key);
+
+  if (!test || !state) {
+    return;
   }
+
+  if (
+    state.manualValue === null ||
+    state.manualValue === undefined ||
+    isNaN(state.manualValue)
+  ) {
+    return;
+  }
+
+  state.useManual =
+    true;
 
   saveRecord(test);
   processAndRender();
 }
 
-function toggleManualOverrideState(key, turnOn) {
-  const test = getCurrentTestRecord();
-  if (!test) return;
 
-  if (turnOn && test.manualOverrides[key] !== undefined) {
-    test.effectiveOutputs[key] = test.manualOverrides[key];
+function toggleManualDependency(key, turnOn) {
+
+  if (turnOn) {
+    enableManualDependency(key);
   } else {
-    // Turn off active override, keeping manualOverrides[key] safe in memory
-    delete test.effectiveOutputs[key];
+    disableManualDependency(key);
   }
-
-  saveRecord(test);
-  processAndRender();
 }
-  
+
+
 /* =========================================================================
    17. BACKWARD DEPENDENCY TRACING
    ========================================================================= */
@@ -2743,75 +2955,164 @@ function getMissingDependencies(
    ========================================================================= */
 
 function submitManualDependency(key, buttonElement) {
-  const container = buttonElement.closest('.dependency-choice');
-  const input = container.querySelector(`[data-manual-dependency-key="${key}"]`);
-  if (!input) return;
-  handleManualOverride(key, input.value);
-  const box = buttonElement.closest('.dependency-box');
-  if (box) box.remove();
+
+  const container =
+    buttonElement.closest('.dependency-choice');
+
+  const input =
+    container?.querySelector(
+      `[data-manual-dependency-key="${key}"]`
+    );
+
+  if (!input) {
+    return;
+  }
+
+  setManualDependencyValue(
+    key,
+    input.value
+  );
+
+  const box =
+    buttonElement.closest('.dependency-box');
+
+  if (box) {
+    box.remove();
+  }
 }
 
+
 function handleMissingDependencyClick(outputKey) {
-  const test = getCurrentTestRecord();
-  const savedVal = test?.manualOverrides?.[outputKey];
-  const isActive = test?.effectiveOutputs?.[outputKey] !== undefined && test?.manualOverrides?.[outputKey] !== undefined;
 
-  const parentEl = document.querySelector(`[data-calc-field-id="${outputKey}"]`)?.closest(".speed-card, .card");
-  if (!parentEl) return;
+  const dependency =
+    getDependencyDefinition(outputKey);
 
-  const existingBox = parentEl.querySelector(".dependency-box");
+  const parentEl =
+    document
+      .querySelector(
+        `[data-calc-field-id="${outputKey}"]`
+      )
+      ?.closest(".speed-card, .card");
+
+  if (!parentEl) {
+    return;
+  }
+
+  const existingBox =
+    parentEl.querySelector(".dependency-box");
+
   if (existingBox) {
     existingBox.remove();
     return;
   }
 
-  const box = document.createElement("div");
-  box.className = "dependency-box";
+  const box =
+    document.createElement("div");
 
-  // IF A MANUAL VALUE IS SAVED IN MEMORY: Provide clear buttons to turn on/off or update
-  if (savedVal !== undefined) {
+  box.className =
+    "dependency-box";
+
+  /*
+   * A declared dependency gets its own state object. The automatic value is
+   * refreshed from the provider, while the manual value is retained locally.
+   */
+  if (dependency) {
+
+    const state =
+      getOrCreateDependencyState(outputKey);
+
+    refreshDependencyAutoValue(outputKey);
+
+    const autoValue =
+      state?.autoValue ?? null;
+
+    const manualValue =
+      state?.manualValue ?? null;
+
+    const isActive =
+      state?.useManual === true;
+
+    const hasManual =
+      manualValue !== null &&
+      manualValue !== undefined &&
+      !isNaN(manualValue);
+
+    const autoText =
+      autoValue === null ||
+      autoValue === undefined
+        ? "Not available"
+        : autoValue;
+
     box.innerHTML = `
-      <div class="dependency-title">⚙️ Manual Override Management</div>
+      <div class="dependency-title">⚙️ ${dependency.label}</div>
       <div class="dependency-detail">
-        Stored manual value: <strong>${savedVal}</strong> (${isActive ? 'Currently Active' : 'Currently Inactive / Auto Mode'})
+        Automatic value: <strong>${autoText}</strong>
+        (${isActive ? "Manual override active" : "Automatic mode"})
       </div>
-      <div class="dependency-choice" style="gap: 0.5rem;">
-        ${isActive ? `
-          <button class="btn-action" style="height:40px;font-size:0.85rem;width:100%;background:var(--danger);color:white;border:none;"
-            onclick="clearManualOverride('${outputKey}'); this.closest('.dependency-box').remove();">
-            Turn Off Manual (Revert to Auto)
-          </button>
-        ` : `
-          <button class="btn-action" style="height:40px;font-size:0.85rem;width:100%;background:var(--success);color:white;border:none;"
-            onclick="reenableManualOverride('${outputKey}'); this.closest('.dependency-box').remove();">
-            Turn Back On Manual Value (${savedVal})
-          </button>
-        `}
-        <div style="display:flex; gap:0.4rem; margin-top:0.4rem;">
-          <input type="number" inputmode="decimal" step="any" value="${savedVal}" style="height:38px; font-size:0.9rem; flex:1;" data-new-manual="${outputKey}">
-          <button class="btn-action" style="height:38px; font-size:0.85rem; padding:0 1rem;"
-            onclick="handleManualOverride('${outputKey}', this.previousElementSibling.value); this.closest('.dependency-box').remove();">
-            Update & Use
+
+      ${hasManual ? `
+        <div class="dependency-detail">
+          Stored manual value: <strong>${manualValue}</strong>
+        </div>
+        <div class="dependency-choice" style="gap:0.5rem;">
+          ${isActive ? `
+            <button class="btn-action" style="height:40px;font-size:0.85rem;width:100%;background:var(--danger);color:white;border:none;"
+              onclick="disableManualDependency('${outputKey}'); this.closest('.dependency-box').remove();">
+              Turn Off Manual — Use Automatic
+            </button>
+          ` : `
+            <button class="btn-action" style="height:40px;font-size:0.85rem;width:100%;background:var(--success);color:white;border:none;"
+              onclick="enableManualDependency('${outputKey}'); this.closest('.dependency-box').remove();">
+              Turn On Manual Value (${manualValue})
+            </button>
+          `}
+          <div style="display:flex;gap:0.4rem;margin-top:0.4rem;">
+            <input type="number" inputmode="decimal" step="any" value="${manualValue}" style="height:38px;font-size:0.9rem;flex:1;" data-new-manual="${outputKey}">
+            <button class="btn-action" style="height:38px;font-size:0.85rem;padding:0 1rem;"
+              onclick="setManualDependencyValue('${outputKey}', this.previousElementSibling.value); this.closest('.dependency-box').remove();">
+              Update & Use
+            </button>
+          </div>
+        </div>
+      ` : `
+        <div class="dependency-choice">
+          <input type="number" inputmode="decimal" step="any" placeholder="Enter ${dependency.label} manually" style="height:44px;font-size:0.95rem;" data-manual-dependency-key="${outputKey}">
+          <button class="btn-action" style="height:44px;font-size:0.9rem;width:100%;" onclick="submitManualDependency('${outputKey}', this)">
+            Store & Use Manual Value
           </button>
         </div>
-      </div>
+      `}
     `;
+
     parentEl.appendChild(box);
     return;
   }
 
-  // OTHERWISE: Fall back to standard missing dependency logic
-  const resolved = getResolvedValue(outputKey);
-  if (resolved && resolved.value !== null && resolved.value !== undefined) {
+  /* Existing non-dependency missing-information behavior remains separate. */
+  const resolved =
+    getResolvedValue(outputKey);
+
+  if (
+    resolved &&
+    resolved.value !== null &&
+    resolved.value !== undefined
+  ) {
     return;
   }
 
-  const missing = getMissingDependencies(outputKey);
-  if (missing.length === 0) return;
+  const missing =
+    getMissingDependencies(outputKey);
 
-  const trace = traceBackwardDependencies(outputKey);
+  if (missing.length === 0) {
+    return;
+  }
 
-  let html = `<div class="dependency-title">⚠️ Missing Information</div>`;
+  const trace =
+    traceBackwardDependencies(outputKey);
+
+  let html =
+    `<div class="dependency-title">⚠️ Missing Information</div>`;
+
   if (trace && trace.leaves.length) {
     html += `<div class="dependency-detail">The system traced this calculation backward to the information it actually needs:</div>`;
     trace.leaves.forEach(leaf => {
@@ -2821,6 +3122,7 @@ function handleMissingDependencyClick(outputKey) {
 
   missing.forEach(dep => {
     html += `<div class="dependency-detail">Missing: <strong>${dep.label}</strong></div>`;
+
     if (dep.type === "LOCAL") {
       html += `
         <div class="dependency-choice">
@@ -2832,23 +3134,28 @@ function handleMissingDependencyClick(outputKey) {
       return;
     }
 
-    const providerId = dep.dependency?.providerModuleId;
-    const provider = providerId && ModuleRegistry.get(providerId);
+    const providerId =
+      dep.dependency?.providerModuleId;
+
+    const provider =
+      providerId &&
+      ModuleRegistry.get(providerId);
 
     html += `<div class="dependency-detail">Requires <strong>${dep.label}</strong> from provider: <strong>${provider?.meta?.title || providerId}</strong>.</div>`;
+
     if (provider) {
       html += `
         <button class="btn-action" style="height:44px;font-size:0.9rem;width:100%;"
           onclick="selectModule('${providerId}'); this.closest('.dependency-box').remove();">
-            Find / Complete Dependency →
-          </button>`;
+          Find / Complete Dependency →
+        </button>`;
     }
 
     html += `
       <div class="dependency-choice">
         <input type="number" inputmode="decimal" step="any" placeholder="Enter ${dep.label} manually" style="height:44px;font-size:0.95rem;" data-manual-dependency-key="${dep.key}">
         <button class="btn-action" style="height:44px;font-size:0.9rem;width:100%;" onclick="submitManualDependency('${dep.key}', this)">
-          Enter Value Manually
+          Store & Use Manual Value
         </button>
       </div>`;
   });
@@ -2856,6 +3163,8 @@ function handleMissingDependencyClick(outputKey) {
   box.innerHTML = html;
   parentEl.appendChild(box);
 }
+
+
 /* =========================================================================
    20. RENDERED FIELD REGISTRATION
    ========================================================================= */
@@ -2887,6 +3196,30 @@ function registerRenderedField(
 
     element
   });
+}
+
+
+function isManualValueActive(key) {
+
+  const dependency =
+    getDependencyDefinition(key);
+
+  if (dependency) {
+    return (
+      getOrCreateDependencyState(key)?.useManual === true
+    );
+  }
+
+  const test =
+    getCurrentTestRecord();
+
+  return !!(
+    test &&
+    test.effectiveOutputs &&
+    test.manualOverrides &&
+    test.effectiveOutputs[key] !== undefined &&
+    test.manualOverrides[key] !== undefined
+  );
 }
 
 
@@ -3151,7 +3484,7 @@ function renderInteractiveMode(
               ? ""
               : value;
 
-          input.onchange =
+          input.oninput =
             e =>
               handleInput(
                 comp.fieldId,
@@ -3212,7 +3545,7 @@ function renderInteractiveMode(
             "--";
 
           const testRecord = getCurrentTestRecord();
-          const hasManualOverride = testRecord && testRecord.effectiveOutputs && testRecord.effectiveOutputs[comp.fieldId] !== undefined && testRecord.manualOverrides && testRecord.manualOverrides[comp.fieldId] !== undefined;
+          const hasManualOverride = isManualValueActive(comp.fieldId);
 
           const displayValue = rawValue !== "--" && hasManualOverride ? `${rawValue} *` : rawValue;
 
@@ -3513,7 +3846,7 @@ function renderSpeedMode(
         field.external
       ) {
         const testRecord = getCurrentTestRecord();
-        const hasManualOverride = testRecord && testRecord.effectiveOutputs && testRecord.effectiveOutputs[field.id] !== undefined && testRecord.manualOverrides && testRecord.manualOverrides[field.id] !== undefined;
+        const hasManualOverride = isManualValueActive(field.id);
         const displayValue = value !== "" && hasManualOverride ? `${value} *` : (value !== "" ? value : "--");
         const manualClass = hasManualOverride ? "is-manual" : "";
 
@@ -3597,7 +3930,7 @@ function renderSpeedMode(
             "input[data-field-id]"
           );
 
-        input.onchange =
+        input.oninput =
           e =>
             handleInput(
               field.id,
