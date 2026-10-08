@@ -2460,9 +2460,8 @@ function calculationInputsAvailable(
   return true;
 }
 
-
 /* =========================================================================
-   16. MANUAL OVERRIDE (KISS MEMORY & TOGGLE MODEL)
+   16. MANUAL OVERRIDE (MEMORY & TOGGLE MODEL)
    ========================================================================= */
 
 function handleManualOverride(key, value) {
@@ -2471,12 +2470,36 @@ function handleManualOverride(key, value) {
 
   if (numericValue !== null && !isNaN(numericValue)) {
     test.manualOverrides[key] = numericValue;
-    test.effectiveOutputs[key] = numericValue; // Turn on override
+    test.effectiveOutputs[key] = numericValue; // Turn on active override state
     test.provenance[key] = {
       type: "MANUAL_OVERRIDE",
       enteredAt: new Date().toISOString(),
       source: "USER_ENTERED"
     };
+  }
+
+  saveRecord(test);
+  processAndRender();
+}
+
+function clearManualOverride(key) {
+  const test = getCurrentTestRecord();
+  if (!test) return;
+
+  // Turn off active override so engine falls back to auto/dependency
+  delete test.effectiveOutputs[key];
+  
+  saveRecord(test);
+  processAndRender();
+}
+
+function reenableManualOverride(key) {
+  const test = getCurrentTestRecord();
+  if (!test) return;
+
+  // Turn back on using the stored manual value from memory
+  if (test.manualOverrides[key] !== undefined) {
+    test.effectiveOutputs[key] = test.manualOverrides[key];
   }
 
   saveRecord(test);
@@ -2731,21 +2754,30 @@ function handleMissingDependencyClick(outputKey) {
   const box = document.createElement("div");
   box.className = "dependency-box";
 
-  // IF A MANUAL VALUE IS SAVED IN MEMORY: Provide a clean toggle switch + update option
+  // IF A MANUAL VALUE IS SAVED IN MEMORY: Provide clear buttons to turn on/off or update
   if (savedVal !== undefined) {
     box.innerHTML = `
-      <div class="dependency-title">⚙️ Manual Override Settings</div>
+      <div class="dependency-title">⚙️ Manual Override Management</div>
+      <div class="dependency-detail">
+        Stored manual value: <strong>${savedVal}</strong> (${isActive ? 'Currently Active' : 'Currently Inactive / Auto Mode'})
+      </div>
       <div class="dependency-choice" style="gap: 0.5rem;">
-        <label style="display:flex; align-items:center; gap: 0.5rem; color: var(--text); cursor:pointer; font-size:0.9rem;">
-          <input type="checkbox" style="width:18px; height:18px;" ${isActive ? 'checked' : ''} 
-            onchange="toggleManualOverrideState('${outputKey}', this.checked); this.closest('.dependency-box').remove();">
-          Use Manual Value (${savedVal})
-        </label>
+        ${isActive ? `
+          <button class="btn-action" style="height:40px;font-size:0.85rem;width:100%;background:var(--danger);color:white;border:none;"
+            onclick="clearManualOverride('${outputKey}'); this.closest('.dependency-box').remove();">
+            Turn Off Manual (Revert to Auto)
+          </button>
+        ` : `
+          <button class="btn-action" style="height:40px;font-size:0.85rem;width:100%;background:var(--success);color:white;border:none;"
+            onclick="reenableManualOverride('${outputKey}'); this.closest('.dependency-box').remove();">
+            Turn Back On Manual Value (${savedVal})
+          </button>
+        `}
         <div style="display:flex; gap:0.4rem; margin-top:0.4rem;">
           <input type="number" inputmode="decimal" step="any" value="${savedVal}" style="height:38px; font-size:0.9rem; flex:1;" data-new-manual="${outputKey}">
           <button class="btn-action" style="height:38px; font-size:0.85rem; padding:0 1rem;"
             onclick="handleManualOverride('${outputKey}', this.previousElementSibling.value); this.closest('.dependency-box').remove();">
-            Update
+            Update & Use
           </button>
         </div>
       </div>
@@ -2810,8 +2842,6 @@ function handleMissingDependencyClick(outputKey) {
   box.innerHTML = html;
   parentEl.appendChild(box);
 }
-
-
 /* =========================================================================
    20. RENDERED FIELD REGISTRATION
    ========================================================================= */
