@@ -379,7 +379,7 @@
       color: #9ecbff;
     }
 
-    . {
+    .value-display {
       background: #0d1117;
       border: 1px solid var(--panel-border);
       padding: 1.25rem;
@@ -2317,18 +2317,10 @@ function processRecord() {
           calc.outputKey
         ] = roundedResult;
 
-        const override =
-          test.manualOverrides[
-            calc.outputKey
-          ];
-
-        test.effectiveOutputs[
-          calc.outputKey
-        ] =
-          override !== undefined &&
-          override !== null
-            ? override
-            : roundedResult;
+        // Only overwrite effectiveOutput if a manual override is active (exists in effectiveOutputs or was explicitly set)
+        if (test.effectiveOutputs[calc.outputKey] === undefined) {
+          test.effectiveOutputs[calc.outputKey] = roundedResult;
+        }
 
         /*
          * Preserve the calculation chain.
@@ -2470,62 +2462,37 @@ function calculationInputsAvailable(
 
 
 /* =========================================================================
-   16. MANUAL OVERRIDE
+   16. MANUAL OVERRIDE (KISS MEMORY & TOGGLE MODEL)
    ========================================================================= */
 
-function handleManualOverride(
-  key,
-  value
-) {
+function handleManualOverride(key, value) {
+  const test = getCurrentTestRecord();
+  const numericValue = value === "" ? null : parseFloat(value);
 
-  const test =
-    getCurrentTestRecord();
-
-  const numericValue =
-    value === ""
-      ? null
-      : parseFloat(value);
-
-  if (
-    numericValue === null ||
-    isNaN(numericValue)
-  ) {
-    delete test.manualOverrides[key];
-    delete test.effectiveOutputs[key];
-    delete test.provenance[key];
-  } else {
-    test.manualOverrides[key] =
-      numericValue;
-
-    test.effectiveOutputs[key] =
-      numericValue;
-
+  if (numericValue !== null && !isNaN(numericValue)) {
+    test.manualOverrides[key] = numericValue;
+    test.effectiveOutputs[key] = numericValue; // Turn on override
     test.provenance[key] = {
-
-      type:
-        "MANUAL_OVERRIDE",
-
-      enteredAt:
-        new Date().toISOString(),
-
-      source:
-        "USER_ENTERED"
+      type: "MANUAL_OVERRIDE",
+      enteredAt: new Date().toISOString(),
+      source: "USER_ENTERED"
     };
   }
 
   saveRecord(test);
-
   processAndRender();
 }
 
-function clearManualOverride(key) {
+function toggleManualOverrideState(key, turnOn) {
   const test = getCurrentTestRecord();
   if (!test) return;
 
-  // Clear the manual override and effective outputs for this key
-  delete test.manualOverrides[key];
-  delete test.effectiveOutputs[key];
-  delete test.provenance[key];
+  if (turnOn && test.manualOverrides[key] !== undefined) {
+    test.effectiveOutputs[key] = test.manualOverrides[key];
+  } else {
+    // Turn off active override, keeping manualOverrides[key] safe in memory
+    delete test.effectiveOutputs[key];
+  }
 
   saveRecord(test);
   processAndRender();
@@ -2735,7 +2702,7 @@ function getMissingDependencies(
 
 
 /* =========================================================================
-   19. MISSING DEPENDENCY UI
+   19. MISSING DEPENDENCY & TOGGLE UI
    ========================================================================= */
 
 function submitManualDependency(key, buttonElement) {
@@ -2749,12 +2716,12 @@ function submitManualDependency(key, buttonElement) {
 
 function handleMissingDependencyClick(outputKey) {
   const test = getCurrentTestRecord();
-  const hasManualOverride = test && test.manualOverrides && test.manualOverrides[outputKey] !== undefined;
+  const savedVal = test?.manualOverrides?.[outputKey];
+  const isActive = test?.effectiveOutputs?.[outputKey] !== undefined && test?.manualOverrides?.[outputKey] !== undefined;
 
   const parentEl = document.querySelector(`[data-calc-field-id="${outputKey}"]`)?.closest(".speed-card, .card");
   if (!parentEl) return;
 
-  // Toggle/remove existing dependency box if already open
   const existingBox = parentEl.querySelector(".dependency-box");
   if (existingBox) {
     existingBox.remove();
@@ -2764,29 +2731,33 @@ function handleMissingDependencyClick(outputKey) {
   const box = document.createElement("div");
   box.className = "dependency-box";
 
-  // IF IT HAS A MANUAL OVERRIDE ACTIVE: Give option to clear or update it
-  if (hasManualOverride) {
-    const currentValue = test.manualOverrides[outputKey];
+  // IF A MANUAL VALUE IS SAVED IN MEMORY: Provide a clean toggle switch + update option
+  if (savedVal !== undefined) {
     box.innerHTML = `
-      <div class="dependency-title">⚙️ Manual Override Active</div>
-      <div class="dependency-detail">
-        This value is currently set manually to <strong>${currentValue}</strong> instead of using the automatic calculation/dependency.
-      </div>
-      <div class="dependency-choice">
-        <button class="btn-action" style="height:44px;font-size:0.9rem;width:100%;background:var(--danger);color:white;border:none;"
-          onclick="clearManualOverride('${outputKey}'); this.closest('.dependency-box').remove();">
-          Revert to Auto-Calculated Value
-        </button>
+      <div class="dependency-title">⚙️ Manual Override Settings</div>
+      <div class="dependency-choice" style="gap: 0.5rem;">
+        <label style="display:flex; align-items:center; gap: 0.5rem; color: var(--text); cursor:pointer; font-size:0.9rem;">
+          <input type="checkbox" style="width:18px; height:18px;" ${isActive ? 'checked' : ''} 
+            onchange="toggleManualOverrideState('${outputKey}', this.checked); this.closest('.dependency-box').remove();">
+          Use Manual Value (${savedVal})
+        </label>
+        <div style="display:flex; gap:0.4rem; margin-top:0.4rem;">
+          <input type="number" inputmode="decimal" step="any" value="${savedVal}" style="height:38px; font-size:0.9rem; flex:1;" data-new-manual="${outputKey}">
+          <button class="btn-action" style="height:38px; font-size:0.85rem; padding:0 1rem;"
+            onclick="handleManualOverride('${outputKey}', this.previousElementSibling.value); this.closest('.dependency-box').remove();">
+            Update
+          </button>
+        </div>
       </div>
     `;
     parentEl.appendChild(box);
     return;
   }
 
-  // OTHERWISE: Fall back to your existing missing dependency logic
+  // OTHERWISE: Fall back to standard missing dependency logic
   const resolved = getResolvedValue(outputKey);
   if (resolved && resolved.value !== null && resolved.value !== undefined) {
-    return; // It's valid and auto-calculated, no action needed on click
+    return;
   }
 
   const missing = getMissingDependencies(outputKey);
@@ -3187,7 +3158,7 @@ function renderInteractiveMode(
 
         case "value-display": {
 
-            const resolved =
+          const resolved =
             getResolvedValue(
               comp.fieldId
             );
@@ -3196,11 +3167,9 @@ function renderInteractiveMode(
             resolved?.value ??
             "--";
 
-          // Check specifically for manual overrides in the test record
           const testRecord = getCurrentTestRecord();
-          const hasManualOverride = testRecord && testRecord.manualOverrides && testRecord.manualOverrides[comp.fieldId] !== undefined;
+          const hasManualOverride = testRecord && testRecord.effectiveOutputs && testRecord.effectiveOutputs[comp.fieldId] !== undefined && testRecord.manualOverrides && testRecord.manualOverrides[comp.fieldId] !== undefined;
 
-          // Append an asterisk for accessibility if it's manually overridden
           const displayValue = rawValue !== "--" && hasManualOverride ? `${rawValue} *` : rawValue;
 
           const box =
@@ -3495,12 +3464,12 @@ function renderSpeedMode(
       const value =
         resolved?.value ?? "";
 
-if (
+      if (
         field.computed ||
         field.external
       ) {
         const testRecord = getCurrentTestRecord();
-        const hasManualOverride = testRecord && testRecord.manualOverrides && testRecord.manualOverrides[field.id] !== undefined;
+        const hasManualOverride = testRecord && testRecord.effectiveOutputs && testRecord.effectiveOutputs[field.id] !== undefined && testRecord.manualOverrides && testRecord.manualOverrides[field.id] !== undefined;
         const displayValue = value !== "" && hasManualOverride ? `${value} *` : (value !== "" ? value : "--");
         const manualClass = hasManualOverride ? "is-manual" : "";
 
@@ -3690,6 +3659,9 @@ function updateProjectId(
   }
 
   commitCurrentInputs();
+
+  activeModule =
+    activeModule; // no-op safeguard
 
   activeProjectId =
     trimmed;
