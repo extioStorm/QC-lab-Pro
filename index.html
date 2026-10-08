@@ -2486,9 +2486,23 @@ function clearManualOverride(key) {
   const test = getCurrentTestRecord();
   if (!test) return;
 
-  // Turn off active override so engine falls back to auto/dependency
+  // 1. Turn off active manual override
+  delete test.manualOverrides[key]; // Or keep it in memory if you want memory, but wait—you want memory! 
+  // Ah, earlier you said: "turn off use manual override flag, keep the value, and then it uses the auto filled."
+  // So we only delete effectiveOutputs[key], NOT manualOverrides[key]!
   delete test.effectiveOutputs[key];
-  
+
+  // 2. CLEAR STALE DOWNSTREAM CALCULATIONS so they don't freeze
+  // Find any calculation that depends on this key and wipe its output so it re-computes or shows --
+  if (activeModule && activeModule.calculations) {
+    activeModule.calculations.forEach(calc => {
+      if (calc.inputs.includes(key) || calc.outputKey === key) {
+        delete test.calculatedOutputs[calc.outputKey];
+        delete test.effectiveOutputs[calc.outputKey];
+      }
+    });
+  }
+
   saveRecord(test);
   processAndRender();
 }
