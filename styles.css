@@ -1,0 +1,402 @@
+:root {
+  --bg: #0f1115;
+  --panel: #181b20;
+  --panel-border: #2a2e37;
+  --text: #f0f3f6;
+  --muted: #8b949e;
+  --accent: #3182ce;
+  --accent-tap: #2b6cb0;
+  --success: #2e8540;
+  --warning: #d69e2e;
+  --danger: #c53030;
+  --input-bg: #090a0c;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+header {
+  background: var(--panel);
+  border-bottom: 1px solid var(--panel-border);
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+}
+
+.badge {
+  font-size: 0.75rem;
+  color: var(--muted);
+  background: var(--input-bg);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.module-select-wrapper {
+  width: 100%;
+}
+
+select.mobile-nav {
+  width: 100%;
+  height: 48px;
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  outline: none;
+}
+
+.toolbar {
+  background: var(--panel);
+  border-bottom: 1px solid var(--panel-border);
+  padding: 0.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.project-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.project-meta input {
+  background: var(--input-bg);
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  font-weight: 700;
+  width: 140px;
+  font-size: 0.95rem;
+  text-align: right;
+}
+
+/* ---- Where am I in the tree: Plant / Mix / Sample / Record ---- */
+
+#context-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.ctx-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ctx-label {
+  width: 86px;
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+select.ctx-select {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 0 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+select.ctx-select:disabled {
+  color: var(--muted);
+}
+
+.ctx-add {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--input-bg);
+  color: var(--accent);
+  font-size: 1.3rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ctx-add:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.mode-selector {
+  display: flex;
+  width: 100%;
+  background: var(--input-bg);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  height: 44px;
+}
+
+.mode-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.mode-btn.active {
+  background: var(--accent);
+  color: white;
+}
+
+main {
+  flex: 1;
+  padding: 1rem;
+  display: flex;
+  justify-content: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 600px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.instruction {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin-bottom: 1.25rem;
+  line-height: 1.4;
+}
+
+.field-group {
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+label {
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+input[type="number"],
+input[type="text"] {
+  background: var(--input-bg);
+  border: 1.5px solid var(--panel-border);
+  color: var(--text);
+  height: 52px;
+  padding: 0 0.85rem;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  width: 100%;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: #000;
+}
+
+.formula-box {
+  background: #0d1117;
+  border-left: 4px solid var(--accent);
+  padding: 0.85rem 1rem;
+  border-radius: 0 8px 8px 0;
+  font-family: monospace;
+  font-size: 0.95rem;
+  margin-bottom: 1.25rem;
+  color: #9ecbff;
+}
+
+.value-display {
+  background: #0d1117;
+  border: 1px solid var(--panel-border);
+  padding: 1.25rem;
+  border-radius: 10px;
+  text-align: center;
+  margin-bottom: 1.25rem;
+  cursor: pointer;
+}
+
+.value-display.no-inspect {
+  cursor: default;
+}
+
+.value-display .val {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--success);
+}
+
+.value-display .unit {
+  font-size: 1rem;
+  color: var(--muted);
+  margin-left: 0.3rem;
+  font-weight: 500;
+}
+
+.dependency-box {
+  margin-top: 0.75rem;
+  padding: 0.85rem;
+  background: rgba(49, 130, 206, 0.12);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+}
+
+.dependency-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: var(--accent);
+}
+
+.dependency-detail {
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.4;
+  margin-bottom: 0.65rem;
+}
+
+/* ---- Pick which Rice test supplies the Gmm ---- */
+
+.ref-box {
+  margin-bottom: 0.75rem;
+  padding: 0.85rem;
+  background: rgba(49, 130, 206, 0.12);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+}
+
+.ref-box select {
+  width: 100%;
+  height: 44px;
+  margin-bottom: 0.6rem;
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 0 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.ref-box .dependency-detail {
+  margin-bottom: 0;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-action {
+  height: 52px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  flex: 1;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary { background: var(--accent); color: white; border: none; }
+.btn-secondary { background: transparent; color: var(--muted); border: 1px solid var(--panel-border); }
+.btn-action { background: var(--input-bg); color: var(--accent); border: 1px solid var(--accent); width: 100%; margin-top: 0.5rem; }
+
+.wizard-nav { display: flex; gap: 0.75rem; margin-top: 1rem; }
+
+.empty-card .btn-primary { width: 100%; }
+
+/* ---- shown while a module's procedure has not been confirmed ---- */
+
+.unverified-note {
+  background: rgba(214, 158, 46, 0.12);
+  border: 1px solid var(--warning);
+  color: var(--warning);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  margin-bottom: 1rem;
+}
+
+.speed-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.speed-card-main { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 1rem; }
+.speed-info { flex: 1; }
+.speed-label { font-size: 0.95rem; font-weight: 600; }
+.speed-type { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; margin-top: 0.2rem; }
+.speed-input-wrap { width: 130px; }
+.speed-input-wrap input { height: 44px; font-size: 1rem; text-align: right; }
+.speed-calc-val { font-size: 1.2rem; font-weight: 800; color: var(--success); text-align: right; cursor: pointer; padding: 0.2rem 0.5rem; }
+.speed-calc-val.no-inspect { cursor: default; }
